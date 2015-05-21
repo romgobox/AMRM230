@@ -1,2 +1,3 @@
-AMR system \r\n
+AMR system
+
 Protocol M230
