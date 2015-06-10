@@ -1,6 +1,6 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
-
+#check git ignoe
 import m230_class
 
 wh_adr_set = 145
