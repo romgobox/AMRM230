@@ -1,11 +1,15 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
-#check git ignoe
-import m230_class
+
+from m230_class import m230
+from dev_channel import DirectChannel as DC
+
+
 
 wh_adr_set = 145
 wh_adr_set1 = 43
-merc = m230_class.m230('/dev/ttyUSB0', whTimeout=0.1)
+channel = DC('/dev/ttyUSB0', whTimeout=0.1)
+merc = m230(channel)
 
 '''
 #print merc.chCRC('\x90\x50\x90\x50\x12\x14\x03\x20\x05\x15\x01\x02\x4e')
@@ -53,7 +57,7 @@ for i in m.values():
     
 print len(m)
 
-print merc.chCRC('\x90\x05\xad\xb3')
+
 
 #merc.whAuth(145, 111111, 1)
 '''

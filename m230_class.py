@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
-import serial
+#import serial
 import time
 import datetime
+
 from CRC16 import CRC16
-#from gsm import whCall, whCallTerm
+from utils import chSim, udate
+#from dev_channel import DirectChannel as DC
 
 
+'''
+GSM Methods!
 def whCall(portObj, num='', timeWA=10):
     callCmd = 'ATD'+num+'\r'
     print 'Calling '+num+'...'
@@ -40,9 +44,10 @@ def whCallTerm(portObj, timeWA=3):
     print "ATH"
     portObj.write('ATH\r')
     return True
-
+'''
 
 class m230():
+    """
     def __init__(self, port, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=1, writeTimeout=1, ser = serial.Serial(), whTimeout = 0.1):
         self.port = port        
         self.ser = ser
@@ -61,11 +66,17 @@ class m230():
             print 'Port not found: ' + self.port
         else:
             print 'Port opened'
+    """        
+            
+    def __init__(self, channel):
+        self.channel = channel
+        
+        
     '''
     def cmdWR(self, cmd, CRC=CRC16(True)):
         send = cmd + CRC.calculate(cmd)
-        cmdsend = [self.chSim(hex(ord(x))[2:]) for x in send]
-        print self.udate()+' >>> ' + " ".join(cmdsend)
+        cmdsend = [chSim(hex(ord(x))[2:]) for x in send]
+        print udate()+' >>> ' + " ".join(cmdsend)
         self.ser.write(send)
         time.sleep(self.whTimeout)
         
@@ -73,13 +84,13 @@ class m230():
         rx=3
         while rx>0:
             
-            answer += [self.chSim(hex(ord(x))[2:]) for x in self.ser.read(self.ser.inWaiting())]
+            answer += [chSim(hex(ord(x))[2:]) for x in self.ser.read(self.ser.inWaiting())]
             if len(answer)>2:
                 rx=0
-                print self.udate()+' <<< ' + " ".join(answer)
+                print udate()+' <<< ' + " ".join(answer)
             else:
                 rx=rx-1
-                print self.udate()+' >>> ' + " ".join(cmdsend)
+                print udate()+' >>> ' + " ".join(cmdsend)
                 self.ser.write(send)
                 time.sleep(self.whTimeout)
         
@@ -87,11 +98,15 @@ class m230():
         time.sleep(self.whTimeout)
     '''
     def cmdWR(self, cmd, CRC=CRC16(True)):
+        
         send = cmd + CRC.calculate(cmd)
-        cmdsend = [self.chSim(hex(ord(x))[2:]) for x in send]
-        print self.udate()+' >>> ' + " ".join(cmdsend)
-        self.ser.write(send)
-        #time.sleep(self.whTimeout)
+        cmdsend = [chSim(hex(ord(x))[2:]) for x in send]
+        print udate()+' >>> ' + " ".join(cmdsend)
+        self.channel.TX(send)
+        
+        self.whTimeout = self.channel.whTimeout
+        
+        
         
         answer = []
         ans=''
@@ -100,20 +115,21 @@ class m230():
         while rx>0:
             while timeO < self.whTimeout:
                 time.sleep(0.1)
-                ans += self.ser.read(self.ser.inWaiting())
-                answer += [self.chSim(hex(ord(x))[2:]) for x in ans]
+                ans += self.channel.RX()
+                answer += [chSim(hex(ord(x))[2:]) for x in ans]
                 if self.chCRC(ans):
                     timeO = self.whTimeout
                     rx=0
-                    print self.udate()+' <<< ' + " ".join(answer)
+                    print udate()+' <<< ' + " ".join(answer)
                 else:
                     timeO+=0.1
             if not self.chCRC(ans):
                 rx=rx-1
                 timeO=0
-                print self.udate()+' >>> ' + " ".join(cmdsend)
-                self.ser.write(send)
+                print udate()+' >>> ' + " ".join(cmdsend)
+                self.channel.TX(send)
                 #time.sleep(self.whTimeout)
+     
         
         return answer
         #time.sleep(self.whTimeout)
@@ -230,11 +246,11 @@ class m230():
                 'HiB':ans[1],
                 'LoB':ans[2],
                 'Status':bin(int(ans[3], 16))[2:],
-                'H':self.chSim(ans[4]),
-                'M':self.chSim(ans[5]),
-                'd':self.chSim(ans[6]),
-                'm':self.chSim(ans[7]),
-                'y':self.chSim(ans[8]),
+                'H':chSim(ans[4]),
+                'M':chSim(ans[5]),
+                'd':chSim(ans[6]),
+                'm':chSim(ans[7]),
+                'y':chSim(ans[8]),
                 'Period':int(ans[9], 16),
                 }
         return self.MPLR
@@ -259,11 +275,11 @@ class m230():
         ans = self.cmdWR(self.whAdr + '\x06\x03' + self.chByte(self.HiB) + self.chByte(self.LoB) + '\x0F')
         self.MPVal = {
                 'Status':bin(int(ans[1], 16))[2:],
-                'H':self.chSim(ans[2]),
-                'M':self.chSim(ans[3]),
-                'd':self.chSim(ans[4]),
-                'm':self.chSim(ans[5]),
-                'y':self.chSim(ans[6]),
+                'H':chSim(ans[2]),
+                'M':chSim(ans[3]),
+                'd':chSim(ans[4]),
+                'm':chSim(ans[5]),
+                'y':chSim(ans[6]),
                 'Period':int(ans[7], 16),
                 'A':int(ans[9]+ans[8], 16)*0.001,
                 'R':int(ans[13]+ans[12], 16)*0.001
@@ -304,17 +320,6 @@ class m230():
             if self.ADR == 0: self.ADR = 65520
         return self.MPDVal
         
-    
-    ###################################################################
-    def chSim(self, sim):
-        self.sim = sim
-        if len(self.sim)==1: self.sim = "0" + self.sim
-        return self.sim
-    
-    def udate(self):
-        return datetime.datetime.now().strftime("%d.%m.%y %H:%M:%S.%f")
-    ###################################################################
-    
     def chCRC(self, cmd, CRC=CRC16(True)):
         if CRC.calculate(cmd[:-2]) == cmd[-2:]:
             return True
