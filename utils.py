@@ -20,5 +20,3 @@ def chCRC(cmd, CRC=CRC16(True)):
         else:
             return False
         
-
-print chCRC('\x17\x00\x0E\x40')

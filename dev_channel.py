@@ -5,30 +5,6 @@ import subprocess
 import serial
 
 
-"""
-class DevChannel():
-    
-    def __init__(self, ):
-        pass
-    
-    def direct_channel(self, port, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=1, writeTimeout=1, ser = serial.Serial(), whTimeout = 0.1):
-    
-        ser.port = port
-        ser.baudrate = baudrate
-        ser.bytesize = bytesize
-        ser.parity = parity
-        ser.stopbits = stopbits
-        ser.timeout = timeout
-        ser.writeTimeout = writeTimeout
-        whTimeout = whTimeout
-    
-        try:
-            ser.open()
-        except Exception:
-            print 'Port not found: ' + port
-        else:
-            print 'Port opened'
-"""
     
 class DirectChannel(object):
     
@@ -36,6 +12,7 @@ class DirectChannel(object):
         """
         Открывает прямой канал (как правило по протоколу RS-485) до счетчика.
         """
+        self.port = port
         self.ser = ser
         self.ser.port = port
         self.ser.baudrate = baudrate
@@ -49,15 +26,16 @@ class DirectChannel(object):
         try:
             self.ser.open()
         except Exception:
-            print 'Port not found: ' + self.port
+            print u'Не удалось открыть порт: ' + self.port
         else:
-            print 'Port opened'
+            print u'Инициализация порта: ' + self.port
     
     def TX(self, cmd):
         self.ser.write(cmd)
     
     def RX(self):
        return self.ser.read(self.ser.inWaiting())
+    
     
 
 
