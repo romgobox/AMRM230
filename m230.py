@@ -21,10 +21,10 @@ merc.whAuth(wh_adr_set, 111111, 1)
 print merc.whNum(wh_adr_set)
 print merc.whTime(wh_adr_set)['DateTime']
 m = merc.whMPDVal(wh_adr_set, 1)
-"""
+
 print "************************************************************"
 print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='00', Postfix='\xD2')
-print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='E0', Postfix='\xD2')
+print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='E0', Postfix='\xD1')
 print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='01', LoB='C0', Postfix='\xD2')
 print "*****************************************"
 
@@ -49,7 +49,18 @@ print "************************************************************"
 
 print "*****************  P  ************************************"
 print u"Мощность: "
-print merc.whP(wh_adr_set)
+print merc.whP(wh_adr_set, 'S')
 print "************************************************************"
 
+
+print "*****************  Cosf  ************************************"
+print u"Cosf: "
+print merc.whCosf(wh_adr_set)
+print "************************************************************"
+
+print "*****************  Angle  ************************************"
+print u"Углы между фазами: "
+print merc.whUAngle(wh_adr_set)
+print "************************************************************"
+"""
 merc.whLogOut(wh_adr_set)
