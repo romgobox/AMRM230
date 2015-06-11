@@ -49,10 +49,12 @@ class DirectChannel(object):
     def TXRX(self, cmd):
         answer = []
         ans=''
-        send = cmd + self.CRC.calculate(cmd)
-        cmdsend = [chSim(hex(ord(x))[2:]) for x in send]
-        print udate()+' >>> ' + " ".join(cmdsend)
-        self.TX(send)
+        #send = cmd + self.CRC.calculate(cmd)
+        #cmdsend = [chSim(hex(ord(x))[2:]) for x in send]
+        #print udate()+' >>> ' + " ".join(cmdsend)
+        #self.TX(send)
+        
+        print udate()+' >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd)))
         
         rx=3
         timeO=0
@@ -70,25 +72,21 @@ class DirectChannel(object):
             if not self.CRC.check(ans):
                 rx=rx-1
                 timeO=0
-                print udate()+' >>> ' + " ".join(cmdsend)
-                self.TX(send)
+                print udate()+' >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd)))
+                #self.TX(send)
                 #time.sleep(self.whTimeout)
      
         
-        return answer
-    
-    """
-    def chCRC(self, cmd, whType):
-        typeCRC = {
-            0: CRC(cmd, whType).chCRCM230
-        }
-        return typeCRC[whType]
-    """    
+        return answer   
     
     def TX(self, cmd):
+        
         self.ser.write(cmd)
-    
+        cmdsend = [chSim(hex(ord(x))[2:]) for x in cmd]
+        return cmdsend
+        
     def RX(self):
+        
        return self.ser.read(self.ser.inWaiting())
     
     
