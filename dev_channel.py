@@ -71,7 +71,7 @@ class DirectChannel(object):
                 rx=rx-1
                 timeO=0
                 print udate()+' >>> ' + " ".join(cmdsend)
-                self.channel.TX(send)
+                self.TX(send)
                 #time.sleep(self.whTimeout)
      
         
