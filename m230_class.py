@@ -6,7 +6,7 @@ import subprocess
 import time
 import datetime
 
-from CRC16 import CRC16
+
 from utils import chSim, udate
 
 
@@ -14,14 +14,17 @@ from utils import chSim, udate
 
 
 class m230():
-  
-    def __init__(self, channel, CRC=CRC16(True)):
+    def __init__(self, channel):
+        """
+        Инициализация экземпляра класса канала связи (dev_chsnnel)
+        Инициализация экземпляра класса CRC16
+        """
         self.channel = channel
-        self.CRC = CRC
 
     def cmdWR(self, cmd):
+        return self.channel.TXRX(cmd)
         
-        
+        """
         send = cmd
         cmdsend = [chSim(hex(ord(x))[2:]) for x in send]
         print udate()+' >>> ' + " ".join(cmdsend)
@@ -53,7 +56,8 @@ class m230():
      
         
         return answer
-        #time.sleep(self.whTimeout)
+        """
+
         
 
     def whAuth(self, whAdr=0, whPass=111111, whLevAuth=1):

@@ -16,7 +16,7 @@ merc = m230(channel)
 merc.whAuth(wh_adr_set, 111111, 1)
 print merc.whNum(wh_adr_set)
 print merc.whTime(wh_adr_set)['DateTime']
-m = merc.whMPDVal(wh_adr_set, 10)
+m = merc.whMPDVal(wh_adr_set, 1)
 
 
 for i in m.values():
