@@ -50,4 +50,3 @@ class CRC_M230(object):
                 if (crc & 0x0001):  crc = c_ushort(crc >> 1).value ^ self.crc16_constant
                 else:               crc = c_ushort(crc >> 1).value
             self.crc16_tab.append(hex(crc))
-

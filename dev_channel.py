@@ -35,7 +35,7 @@ class DirectChannel(object):
         typeCRC = {
             0: CRC_M230(True),
         }
-        self.CRC = self.typeCRC[whType]
+        self.CRC = typeCRC[whType]
         """
         """
     
@@ -61,13 +61,13 @@ class DirectChannel(object):
                 time.sleep(0.1)
                 ans += self.RX()
                 answer += [chSim(hex(ord(x))[2:]) for x in ans]
-                if self.chCRC(ans, self.whType):
+                if self.CRC.check(ans):
                     timeO = self.whTimeout
                     rx=0
                     print udate()+' <<< ' + " ".join(answer)
                 else:
                     timeO+=0.1
-            if not self.chCRC(ans, self.whType):
+            if not self.CRC.check(ans):
                 rx=rx-1
                 timeO=0
                 print udate()+' >>> ' + " ".join(cmdsend)

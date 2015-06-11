@@ -23,42 +23,6 @@ class m230():
 
     def cmdWR(self, cmd):
         return self.channel.TXRX(cmd)
-        
-        """
-        send = cmd
-        cmdsend = [chSim(hex(ord(x))[2:]) for x in send]
-        print udate()+' >>> ' + " ".join(cmdsend)
-        self.channel.TX(send)
-        
-        self.whTimeout = self.channel.whTimeout
-        
-        answer = []
-        ans=''
-        rx=3
-        timeO=0
-        while rx>0:
-            while timeO < self.whTimeout:
-                time.sleep(0.1)
-                ans += self.channel.RX()
-                answer += [chSim(hex(ord(x))[2:]) for x in ans]
-                if self.chCRC(ans):
-                    timeO = self.whTimeout
-                    rx=0
-                    print udate()+' <<< ' + " ".join(answer)
-                else:
-                    timeO+=0.1
-            if not self.chCRC(ans):
-                rx=rx-1
-                timeO=0
-                print udate()+' >>> ' + " ".join(cmdsend)
-                self.channel.TX(send)
-                #time.sleep(self.whTimeout)
-     
-        
-        return answer
-        """
-
-        
 
     def whAuth(self, whAdr=0, whPass=111111, whLevAuth=1):
         """
@@ -69,9 +33,13 @@ class m230():
         """
         
         whPass_chr = ''.join([chr(int(x)) for x in str(whPass)])
-        cmd = chr(whAdr) + '\x01' + chr(whLevAuth) + whPass_chr
-        authCmd = cmd + self.CRC.calculate(cmd)
-        authAns = self.cmdWR(authCmd)
+        whAuthCmd = chr(whAdr) + '\x01' + chr(whLevAuth) + whPass_chr
+        authAns = self.cmdWR(whAuthCmd)
+        if authAns != '':
+            print u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass))
+        else:
+            print u'Не удалось установить соединение со счетчиком '+ str(whAdr)
+        """
         chAns=[]
         readyAns = chr(whAdr) + '\x00' + self.CRC.calculate(chr(whAdr) + '\x00')
         chAns += [chSim(hex(ord(x))[2:]) for x in readyAns]
@@ -80,13 +48,14 @@ class m230():
             print u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass))
         else:
             print u'Не удалось установить соединение со счетчиком '+ str(whAdr)
+        """
     
     def whLogOut(self, whAdr=0):
         """
         Метод для завершения соединения со счетчиком
         """
-        cmd = chr(whAdr) + '\x02'
-        logOutCmd = cmd + self.CRC.calculate(cmd)
+
+        logOutCmd = chr(whAdr) + '\x02'
         logOutAns = self.cmdWR(logOutCmd)
         
     def whNum(self, whAdr=0):
@@ -95,8 +64,8 @@ class m230():
         возвращает номер в виде строки
         """
         
-        cmd = chr(whAdr) + '\x08\x00'
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whNumCmd = chr(whAdr) + '\x08\x00'
+        ans = self.cmdWR(whNumCmd)
         whN = [str(int(x, 16)) for x in ans[1:5]]
         return "".join(whN)
         
@@ -109,8 +78,8 @@ class m230():
         Принимает в качетсве параметров сетевой адрес прибора учет, формат даты и времени
         """
         
-        cmd = chr(whAdr) + '\x04\x00'
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whTimeCmd = chr(whAdr) + '\x04\x00'
+        ans = self.cmdWR(whTimeCmd)
         time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
         whDateForm = time.strftime(datetimefrmt, time_tuple)
         whSeason = int(ans[-3])
@@ -124,8 +93,8 @@ class m230():
         Принимает в качетсве параметров сетевой адрес прибора учет, номер тарифа (значение по-умолчанию 00-суммарная энергия)
         """
         
-        cmd = chr(whAdr) + '\x05\x00' + chr(whT)
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whCurValCmd = chr(whAdr) + '\x05\x00' + chr(whT)
+        ans = self.cmdWR(whCurValCmd)
         whCurA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.001
         whCurR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.001
         whCur = {'A':whCurA, 'R':whCurR}
@@ -147,8 +116,8 @@ class m230():
         else:
             print 'value currentday must be 1 for current day or 0 for previous day'
             
-        cmd = chr(whAdr) + '\x06\x02' + valAdr[whT] + '\x10'
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whFixDayCmd = chr(whAdr) + '\x06\x02' + valAdr[whT] + '\x10'
+        ans = self.cmdWR(whFixDayCmd)
         whFixA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
         whFixR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
         whFix = {'A':whFixA, 'R':whFixR}
@@ -178,8 +147,8 @@ class m230():
             12:{0:'\x06\x51', 1:'\x06\x62', 2:'\x06\x73', 3:'\x06\x84', 4:'\x06\x95'}
         }
         if month == int(datetime.datetime.now().strftime("%m")): month = int(datetime.datetime.now().strftime("%m"))
-        cmd = chr(whAdr) + '\x06\x02' + valAdr[month][whT] + '\x10'
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whFixMonthCmd = chr(whAdr) + '\x06\x02' + valAdr[month][whT] + '\x10'
+        ans = self.cmdWR(whFixMonthCmd)
         whFixMA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
         whFixMR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
         whFixM = {'A':whFixMA, 'R':whFixMR}
@@ -202,8 +171,8 @@ class m230():
          Принимает в качетсве параметров сетевой адрес прибора учет
         """
         
-        cmd = chr(whAdr) + '\x08\x13'
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whMPLRCmd = chr(whAdr) + '\x08\x13'
+        ans = self.cmdWR(whMPLRCmd)
         MPLR = {
                 'HiB':ans[1],
                 'LoB':ans[2],
@@ -236,8 +205,8 @@ class m230():
         
 
         chByte = lambda x: chr(int(x, 16))
-        cmd = chr(whAdr) + '\x06\x03' + chByte(HiB) + chByte(LoB) + '\x0F'
-        ans = self.cmdWR(cmd + self.CRC.calculate(cmd))
+        whMPValCmd = chr(whAdr) + '\x06\x03' + chByte(HiB) + chByte(LoB) + '\x0F'
+        ans = self.cmdWR(whMPValCmd)
         MPVal = {
                 'Status':bin(int(ans[1], 16))[2:],
                 'H':chSim(ans[2]),
@@ -286,13 +255,7 @@ class m230():
             ADR = ADR - 16
             if ADR == 0: ADR = 65520
         return MPDVal
-        
-    def chCRC(self, cmd, CRC=CRC16(True)):
-        if CRC.calculate(cmd[:-2]) == cmd[-2:]:
-            return True
-        else:
-            return False
-        
+      
 
 
 
