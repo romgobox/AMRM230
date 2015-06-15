@@ -255,6 +255,42 @@ class m230():
             if ADR == 0: ADR = 65520
         return MPDVal
     
+    def whMPDValFast(self, whAdr=0, deep=1):
+        """
+            !!! Тестовый метод для ускоренного чтения профиля, непосредственно по ячейкам памяти прибора!
+            Метод предназначен для чтения записи средних мощностей на определенную глубину,
+            возвращает словарь с ключами:
+                        'Status' - байт-статус записи (см. описание протокола)
+                        'H' - час фиксации
+                        'M' - минута фиксации
+                        'd' - день фиксации
+                        'm' - месяц фиксации
+                        'y' - год фиксации
+                        'Period' - период интегрирования мощности
+                        'A' - активная мощность
+                        'R' - реактивная мощность
+            Принимает в качетсве параметров сетевой адрес прибора учет, глубину опроса
+        """
+        
+        MPDVal = {}
+
+        ADR = 0
+        for i in range(0, deep):
+            ADRH = hex(ADR)[2:]
+            ADRres = {
+                1: '0000',
+                2: '00'+str(ADRH[0:]),
+                3: '0'+str(ADRH[0:]),
+                4: str(ADRH[0:])
+            }.get(len(ADRH))
+            ADRHi = ADRres[0:2]
+            ADRLo = ADRres[2:]
+            ans = self.whTestCMD('', True, whAdr, Prefix='\x06\x83', HiB=ADRHi, LoB=ADRLo, Postfix='\xD2')
+            MPDVal[i] = ans
+            ADR = ADR + 224
+            if ADR == 65408: ADR = 0
+        return MPDVal
+    
     """
         Мгновенные значения
     """
@@ -360,7 +396,7 @@ class m230():
             Cosf[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
         return Cosf
     
-    def whTestCMD(self, cmd='', useAdr=False, whAdr=0, Prefix='', HiB='', LoB='', Postfix=''):
+    def whTestCMD(self, cmd='', useAdr=True, whAdr=0, Prefix='', HiB='', LoB='', Postfix=''):
         """
             Тестовая посылка, для экспериментов
         """
