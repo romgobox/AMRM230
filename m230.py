@@ -23,8 +23,8 @@ print merc.whTime(wh_adr_set)['DateTime']
 m = merc.whMPDVal(wh_adr_set, 1)
 
 print "************************************************************"
-print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='00', Postfix='\xD2')
-print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='E0', Postfix='\xD1')
+print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='00', Postfix='\xd2')
+print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='00', LoB='E0', Postfix='\xD2')
 print merc.whTestCMD(useAdr=True, whAdr=wh_adr_set, Prefix='\x06\x83', HiB='01', LoB='C0', Postfix='\xD2')
 print "*****************************************"
 

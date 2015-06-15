@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
-#import serial
 import time
 import datetime
+import logging
 
 
 from utils import chSim, udate
