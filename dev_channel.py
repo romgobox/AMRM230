@@ -32,7 +32,6 @@ class DirectChannel(object):
         self.ser.timeout = timeout
         self.ser.writeTimeout = writeTimeout
         self.whTimeout = whTimeout
-        #self.whType = whType
         
         typeCRC = {
             0: CRC_M230(True),
@@ -44,17 +43,15 @@ class DirectChannel(object):
         try:
             self.ser.open()
         except Exception:
-            #print u'Не удалось открыть порт: ' + self.port
             logging.error(u'Не удалось открыть порт: ' + self.port)
         else:
-            #print u'Инициализация порта: ' + self.port
             logging.debug(u'Инициализация порта: ' + self.port)
     
     def TXRX(self, cmd):
         answer = []
-        ans=''        
-        #print udate()+' >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd)))
-        logging.debug(u'TX >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd))))
+        ans=''
+        cmdTX = self.TX(cmd + self.CRC.calculate(cmd))
+        logging.debug(u'TX >>> ' + " ".join(cmdTX[0]) + ' [' + str(cmdTX[1]) +'] ')
         
         rx=3
         timeO=0
@@ -66,26 +63,24 @@ class DirectChannel(object):
                 if self.CRC.check(ans):
                     timeO = self.whTimeout
                     rx=0
-                    #print udate()+' <<< ' + " ".join(answer)
-                    logging.debug(u'RX <<< ' + " ".join(answer))
+                    cmdRX = [answer, len(answer)]
+                    logging.debug(u'RX <<< ' + " ".join(cmdRX[0]) + ' [' + str(cmdRX[1]) +'] ')
                 else:
                     timeO+=0.1
             if not self.CRC.check(ans):
                 rx=rx-1
                 timeO=0
-                #print udate()+' >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd)))
-                logging.debug(u'TX >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd))))
-                #self.TX(send)
-                #time.sleep(self.whTimeout)
-     
-        
+                #logging.debug(u'TX >>> ' + " ".join(self.TX(cmd + self.CRC.calculate(cmd))))
+                logging.debug(u'TX >>> ' + " ".join(cmdTX[0]) + '{' + str(cmdTX[1]) +'}')
+    
         return answer   
     
     def TX(self, cmd):
         
         self.ser.write(cmd)
         cmdsend = [chSim(hex(ord(x))[2:]) for x in cmd]
-        return cmdsend
+        cmdTX = [cmdsend, len(cmdsend)]
+        return cmdTX
         
     def RX(self):
         
