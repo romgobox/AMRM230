@@ -3,8 +3,10 @@
 
 import subprocess
 import time
-import datetime
+from datetime import datetime
 import logging
+#logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'communications.log')
+logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG)
 
 
 from utils import chSim, udate
@@ -16,13 +18,13 @@ from utils import chSim, udate
 class m230():
     def __init__(self, channel):
         """
-        Инициализация экземпляра класса канала связи (dev_chsnnel)
+        Инициализация экземпляра класса канала связи (dev_channel)
         Инициализация экземпляра класса CRC16
         """
         self.channel = channel
 
-    def cmdWR(self, cmd):
-        return self.channel.TXRX(cmd)
+    def cmdWR(self, cmd, byteExpected=0):
+        return self.channel.TXRX(cmd, byteExpected)
 
     def whAuth(self, whAdr=0, whPass=111111, whLevAuth=1):
         """
@@ -34,11 +36,16 @@ class m230():
         
         whPass_chr = ''.join([chr(int(x)) for x in str(whPass)])
         whAuthCmd = chr(whAdr) + '\x01' + chr(whLevAuth) + whPass_chr
+        logging.debug(u'Соединение со счетчиком %s и паролем %s:' % (str(whAdr), str(whPass)))
         authAns = self.cmdWR(whAuthCmd)
-        if authAns != '':
-            print u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass))
+        if authAns[0:2] == [hex(whAdr)[2:], '00']:
+            logging.debug(u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass)))
+            auth = True
         else:
-            print u'Не удалось установить соединение со счетчиком '+ str(whAdr)
+            logging.error(u'Не удалось установить соединение со счетчиком '+ str(whAdr))
+            auth = False
+
+        return auth
     
     def whLogOut(self, whAdr=0):
         """
@@ -65,6 +72,7 @@ class m230():
             Метод предназначен для чтения даты, времени и признака сезона
             возвращает словарь с ключами 'DateTime' - дату, время в доступном для стандартного форматирования виде,
             а также 'Season' - признак сезона 1-зима, 0-лето
+            'TimeDiff' - разница времени между прибором и сервером, в секундах
             Принимает в качетсве параметров сетевой адрес прибора учет, формат даты и времени
         """
         
@@ -73,7 +81,8 @@ class m230():
         time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
         whDateForm = time.strftime(datetimefrmt, time_tuple)
         whSeason = int(ans[-3])
-        whDateTime = {'DateTime': whDateForm, 'Season': whSeason}
+        whTimeDelta = datetime.strptime(whDateForm, datetimefrmt) - datetime.now()
+        whDateTime = {'DateTime': whDateForm, 'Season': whSeason, 'TimeDiff':whTimeDelta.seconds}
         return whDateTime
     
     def whCurVal(self, whAdr=0, whT=00):
@@ -114,7 +123,7 @@ class m230():
         return self.whFix
     
     
-    def whFixMonth(self, whAdr=0, month=int(datetime.datetime.now().strftime("%m")), whT=0):
+    def whFixMonth(self, whAdr=0, month=int(datetime.now().strftime("%m")), whT=0):
         """
             Метод предназначен для чтения зафиксированных показаний ПУ на начало месяца, суммарно или по тарифам
             возвращает словарь с ключами 'A', 'R' - значение активной/реактивной энергии
@@ -136,7 +145,7 @@ class m230():
             11:{0:'\x05\xFC', 1:'\x06\xD0', 2:'\x06\x1E', 3:'\x06\x2F', 4:'\x06\x40'},
             12:{0:'\x06\x51', 1:'\x06\x62', 2:'\x06\x73', 3:'\x06\x84', 4:'\x06\x95'}
         }
-        if month == int(datetime.datetime.now().strftime("%m")): month = int(datetime.datetime.now().strftime("%m"))
+        if month == int(datetime.now().strftime("%m")): month = int(datetime.now().strftime("%m"))
         whFixMonthCmd = chr(whAdr) + '\x06\x02' + valAdr[month][whT] + '\x10'
         ans = self.cmdWR(whFixMonthCmd)
         whFixMA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
