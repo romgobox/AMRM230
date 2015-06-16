@@ -8,30 +8,48 @@ import logging
 #logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'communications.log')
 logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG)
 
-
 from utils import chSim, udate
 
 
 
 
 
+
 class m230():
+    """The class implements the basic protocol commands metering device Mercury 230
+    
+    Args:
+    
+        channel (object): an instance of an object that implements the transfer of information (direct channel, GSM (CSD), TCP / IP)
+    """
     def __init__(self, channel):
-        """
-        Инициализация экземпляра класса канала связи (dev_channel)
-        Инициализация экземпляра класса CRC16
-        """
         self.channel = channel
 
-    def cmdWR(self, cmd, byteExpected=0):
-        return self.channel.TXRX(cmd, byteExpected)
+    def cmdWR(self, cmd):
+        return self.channel.TXRX(cmd)
 
     def whAuth(self, whAdr=0, whPass=111111, whLevAuth=1):
-        """
-            Метод для авторизации в приборе учета (ПУ). Принимает в качестве параметров сетевой адрес ПУ
-            (значение int, для Меркурий 230 в диапазоне 1 - 240, на адрес 0 отвечает любой прибор учета на шине,
-            не рекомендуется использовать с группой счетчиков), пароль 1-го или 2-го уровня доступа, уровень доступа
-            (1-й чтение информации, 2-й чтение и запись параметров)
+        """Method for authorization in the metering device
+        
+        Sends command authorization in the metering device
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            whPass (int): password metering device, (default value: 111111).
+            whLevAuth (int): the access level metering device, 1 - read data (default value), 2 - reading / writing data.
+        
+        Returns:
+        
+            bool: True, if the authentication is successful, False in any other case.
+        
+        Examples:
+        
+            >>> m230.whAuth (whAdr = 145, whPass = 111111, whLevAuth = 1)
+            True
+            
+            >>> m230.whAuth (whAdr = 145, whPass = 111111, whLevAuth = 2)
+            False
         """
         
         whPass_chr = ''.join([chr(int(x)) for x in str(whPass)])
@@ -42,72 +60,174 @@ class m230():
             logging.debug(u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass)))
             auth = True
         else:
-            logging.error(u'Не удалось установить соединение со счетчиком '+ str(whAdr))
+            logging.error(u'Не удалось установить соединение со счетчиком %s' % str(whAdr))
             auth = False
 
         return auth
     
     def whLogOut(self, whAdr=0):
-        """
-            Метод для завершения соединения со счетчиком
+        """Method to close the connection with the meter
+        
+        Sends command to close the connection with the meter
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            
+        
+        Returns:
+        
+            bool: True.
+        
+        Examples:
+        
+            >>> m230.whLogOut (whAdr = 145)
         """
 
         logOutCmd = chr(whAdr) + '\x02'
         logOutAns = self.cmdWR(logOutCmd)
+        return True
         
     def whNum(self, whAdr=0):
-        """
-            Метод предназначен для чтения серийного номера прибора учета
-            возвращает номер в виде строки
+        """Method is intended to read the serial number of the metering device
+        
+        Sends command to read the serial number of the metering device
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+        
+        Returns:
+        
+            str: device serial number as a string.
+        
+        Examples:
+        
+            >>> m230.whNum (whAdr = 145)
+            11199145
         """
         
         whNumCmd = chr(whAdr) + '\x08\x00'
         ans = self.cmdWR(whNumCmd)
-        whN = [str(int(x, 16)) for x in ans[1:5]]
-        return "".join(whN)
+        try:
+            whN = [str(int(x, 16)) for x in ans[1:5]]
+            whNum = "".join(whN)
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение серийного номера прибора учета! Причина: %s' % e)
+            whNum = False
+        return whNum
         
    
     def whTime(self, whAdr=0, datetimefrmt='%d.%m.%y %H:%M:%S'):
-        """
-            Метод предназначен для чтения даты, времени и признака сезона
-            возвращает словарь с ключами 'DateTime' - дату, время в доступном для стандартного форматирования виде,
-            а также 'Season' - признак сезона 1-зима, 0-лето
-            'TimeDiff' - разница времени между прибором и сервером, в секундах
-            Принимает в качетсве параметров сетевой адрес прибора учет, формат даты и времени
+        """Method is intended for reading the date, time and indication of the season
+        
+        Sends command to read the date, time and indication of the season
+        Args:
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus
+            datetimefrmt (str): datetime format as a string
+        
+        Returns:
+            dict: with key: (type) value
+                DateTime :(str) a string representation of a datetime, depending on the `datetimefrmt`
+                TimeDiff :(int) time difference between device and server, in seconds
+                Season :(int) indicates the season, 1 - winter time, 0 - summer time (`su-a-amer ti-a-ame...`)
+        
+        Examples:
+        
+            >>> whTime = m230.whTime(whAdr=145, datetimefrmt='%Y-%m-%d %H:%M:%S')
+            >>> print 'Device datetime: %s, Season: %d, Time difference: %d' % (whTime['DateTime'], whTime['Season'], whTime['TimeDiff'])
+            Device datetime: 2015-06-16 10:00:44, Season: 1, Time difference: 3523
         """
         
         whTimeCmd = chr(whAdr) + '\x04\x00'
         ans = self.cmdWR(whTimeCmd)
-        time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
-        whDateForm = time.strftime(datetimefrmt, time_tuple)
-        whSeason = int(ans[-3])
-        whTimeDelta = datetime.strptime(whDateForm, datetimefrmt) - datetime.now()
-        whDateTime = {'DateTime': whDateForm, 'Season': whSeason, 'TimeDiff':whTimeDelta.seconds}
+        try:
+            time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
+            whDateForm = time.strftime(datetimefrmt, time_tuple)
+            whSeason = int(ans[-3])
+            whTimeDelta = datetime.strptime(whDateForm, datetimefrmt) - datetime.now()
+            whDateTime = {'DateTime': whDateForm, 'Season': whSeason, 'TimeDiff':whTimeDelta.seconds}
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение времени прибора учета! Причина: %s' % e)
+            whDateTime = False
         return whDateTime
     
-    def whCurVal(self, whAdr=0, whT=00):
-        """
-            Метод предназначен для чтения текущих показаний ПУ (от сброса) всего или по тарифам
-            возвращает словарь с ключами 'A', 'R' - значение активной/реактивной энергии
-            Принимает в качетсве параметров сетевой адрес прибора учет, номер тарифа (значение по-умолчанию 00-суммарная энергия)
+    def whCurVal(self, whAdr=0, whT=0):
+        """Method is intended for reading current values of energy (total or by tariffs)
+        
+        Sends command to read the current values of energy (total or by tariffs)
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            whT (int): number of tariff, 0 - total (default value).
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                A :(float) active energy value.
+                R :(float) reactive energy value.
+                
+        Examples:
+        
+            >>> totalEn = merc.whCurVal(whAdr=145, whT=0)
+            >>> print 'Total energy A: %.2f R: %.2f' % (totalEn['A'], totalEn['R'])
+            Total energy A: 276.11 R: 0.63
+            
+            >>> T1_En = merc.whCurVal(whAdr=145, whT=1)
+            >>> print 'Tariff 1 energy A: %.2f R: %.2f' % (T1_En['A'], T1_En['R'])
+            Tariff 1 energy A: 184.48 R: 0.27
+            
+            >>> T2_En = merc.whCurVal(whAdr=145, whT=2)
+            >>> print 'Tariff 2 energy A: %.2f R: %.2f' % (T2_En['A'], T2_En['R'])
+            Tariff 2 energy A: 91.63 R: 0.36
         """
         
         whCurValCmd = chr(whAdr) + '\x05\x00' + chr(whT)
         ans = self.cmdWR(whCurValCmd)
-        whCurA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.001
-        whCurR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.001
-        whCur = {'A':whCurA, 'R':whCurR}
+        try:
+            whCurA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.001
+            whCurR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.001
+            #TODO: implements new key ['T'] for indicate the number of tariff in return dict
+            whCur = {'A':whCurA, 'R':whCurR}
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение текущих показаний прибора учета! Причина: %s' % e)
+            whCur = False
         return whCur
     
     
     def whFixDay(self, whAdr=0, whT=0, currentday=1):
-        """
-            Метод предназначен для чтения зафиксированных показаний ПУ на начало суток всего или по тарифам
-            возвращает словарь с ключами 'A', 'R' - значение активной/реактивной энергии
-            Принимает в качетсве параметров сетевой адрес прибора учет, номер тарифа (значение по-умолчанию 0-суммарная энергия),
-            currentday: 1 - текущие сутки, 0 - предыдущие сутки
-        """
+        """Method is intended for reading fixed values of the day (total or by tariffs)
+        
+        Sends command to read the fixed values of the day (total or by tariffs)
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            whT (int): number of tariff, 0 - total (default value).
+            currentday (int): 1 - current day (default value), 0 - last day
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                A :(float) active energy value.
+                R :(float) reactive energy value.
+                
+        Examples:
+            
+            >>> totalEn = merc.whFixDay(whAdr=145, whT=0, currentday=1)
+            >>> print 'Total energy, current day  A: %.2f R: %.2f' % (totalEn['A'], totalEn['R'])
+            Total energy, current day  A: 276.11 R: 0.63
 
+            >>> T1_En = merc.whFixDay(whAdr=145, whT=1, currentday=1)
+            >>> print 'Tariff 1 energy, current day A: %.2f R: %.2f' % (T1_En['A'], T1_En['R'])
+            Tariff 1 energy, current day A: 184.48 R: 0.27
+            
+            >>> totalEn = merc.whFixDay(whAdr=145, whT=0, currentday=0)
+            >>> print 'Total energy, last day  A: %.2f R: %.2f' % (totalEn['A'], totalEn['R'])
+            Total energy, last day  A: 276.11 R: 0.63
+        """
+        
         if currentday == 1:
             valAdr = {0:'\x06\xA6', 1:'\x06\xB7', 2:'\x06\xC8', 3:'\x06\xD9', 4:'\x06\xEA'}
         elif currentday == 0:
@@ -117,20 +237,50 @@ class m230():
             
         whFixDayCmd = chr(whAdr) + '\x06\x02' + valAdr[whT] + '\x10'
         ans = self.cmdWR(whFixDayCmd)
-        whFixA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
-        whFixR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
-        whFix = {'A':whFixA, 'R':whFixR}
-        return self.whFix
+        try:
+            whFixA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
+            whFixR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
+            #TODO: implements new key ['T'] for indicate the number of tariff in return dict
+            whFix = {'A':whFixA, 'R':whFixR}
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало суток! Причина: %s' % e)
+            whFix = False
+        return whFix
     
     
-    def whFixMonth(self, whAdr=0, month=int(datetime.now().strftime("%m")), whT=0):
+    def whFixMonth(self, whAdr=0, whT=0, month=int(datetime.now().strftime("%m"))):
+        """Method is intended for reading fixed values of the month (total or by tariffs)
+        
+        Sends command to read the fixed values of the month (total or by tariffs)
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            whT (int): number of tariff, 0 - total (default value).
+            month (int): number of month (default value: current month).
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                A :(float) active energy value.
+                R :(float) reactive energy value.
+                
+        
+        Examples:
+            
+            >>> totalEn = merc.whFixMonth(whAdr=145, whT=0)
+            >>> print 'Total energy, current month  A: %.2f R: %.2f' % (totalEn['A'], totalEn['R'])
+            Total energy, current month  A: 276.11 R: 0.63
+            
+            >>> T1_En = merc.whFixMonth(whAdr=145, whT=1)
+            >>> print 'Tariff 1 energy, current month A: %.2f R: %.2f' % (T1_En['A'], T1_En['R'])
+            Tariff 1 energy, current month A: 184.48 R: 0.27
+            
+            >>> totalEn = merc.whFixMonth(whAdr=145, whT=0, month=5)
+            >>> print 'Total energy, May  A: %.2f R: %.2f' % (totalEn['A'], totalEn['R'])
+            Total energy, May  A: 276.11 R: 0.63
         """
-            Метод предназначен для чтения зафиксированных показаний ПУ на начало месяца, суммарно или по тарифам
-            возвращает словарь с ключами 'A', 'R' - значение активной/реактивной энергии
-            Принимает в качетсве параметров сетевой адрес прибора учет, месяц (по-умолчанию текущий) номер тарифа
-            (значение по-умолчанию 0-суммарная энергия),
-        """
-
+        
         valAdr = {
             1:{0:'\x02\xAA', 1:'\x02\xBB', 2:'\x02\xCC', 3:'\x02\xDD', 4:'\x02\xEE'},
             2:{0:'\x02\xFF', 1:'\x03\x10', 2:'\x03\x21', 3:'\x03\x32', 4:'\x03\x43'},
@@ -145,79 +295,122 @@ class m230():
             11:{0:'\x05\xFC', 1:'\x06\xD0', 2:'\x06\x1E', 3:'\x06\x2F', 4:'\x06\x40'},
             12:{0:'\x06\x51', 1:'\x06\x62', 2:'\x06\x73', 3:'\x06\x84', 4:'\x06\x95'}
         }
-        if month == int(datetime.now().strftime("%m")): month = int(datetime.now().strftime("%m"))
         whFixMonthCmd = chr(whAdr) + '\x06\x02' + valAdr[month][whT] + '\x10'
         ans = self.cmdWR(whFixMonthCmd)
-        whFixMA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
-        whFixMR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
-        whFixM = {'A':whFixMA, 'R':whFixMR}
+        try:
+            whFixMA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
+            whFixMR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
+            whFixM = {'A':whFixMA, 'R':whFixMR}
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало месяца! Причина: %s' % e)
+            whFixM = False
         return whFixM
     
     
-    def whMPLR(self, whAdr=0):
-        """
-            Метод предназначен для чтения адреса последней записи средних мощностей,
-            возвращает словарь с ключами:
-                        'HiB' - старший байт адреса
-                        'LoB' - младший байт адреса
-                        'Status' - байт-статус записи (см. описание протокола)
-                        'H' - час фиксации
-                        'M' - минута фиксации
-                        'd' - день фиксации
-                        'm' - месяц фиксации
-                        'y' - год фиксации
-                        'Period' - период интегрирования мощности
-             Принимает в качетсве параметров сетевой адрес прибора учет
+    def whPPLastRecord(self, whAdr=0):
+        """Method is intended for reading last record values of power profile
+        
+        Sends command to read the last record values of power profile
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                HiB :(str) high byte records addres.
+                LoB :(str) low byte records addres.
+                Status: (str) binary representation of records status (check protocol), e.g. 11001
+                H: (str) records Hour fixation
+                m: (str) records Minute fixation
+                d: (str) records Day fixation
+                m: (str) records Month fixation
+                y: (str) records Year fixation
+                Period: (int) power discreteness  
+        
+        Examples:
+            
+            >>> PPLR = merc.whPPLastRecord(whAdr=145)
+            >>> print 'Last Record Status: %s, Period: %s, High Byte: %s, Low Byte: %s, DateTime: %s-%s-%s %s:%s' % \
+                (PPLR['Status'], PPLR['Period'], PPLR['HiB'], PPLR['LoB'], PPLR['d'], PPLR['m'], PPLR['y'], PPLR['H'], PPLR['M'])
+            Last Record Status: 11001, Period: 30, High Byte: 49, Low Byte: 30, DateTime: 16-06-15 12:30
         """
         
-        whMPLRCmd = chr(whAdr) + '\x08\x13'
-        ans = self.cmdWR(whMPLRCmd)
-        MPLR = {
-                'HiB':ans[1],
-                'LoB':ans[2],
-                'Status':bin(int(ans[3], 16))[2:],
-                'H':chSim(ans[4]),
-                'M':chSim(ans[5]),
-                'd':chSim(ans[6]),
-                'm':chSim(ans[7]),
-                'y':chSim(ans[8]),
-                'Period':int(ans[9], 16),
-                }
-        return MPLR
+        whPPLRCmd = chr(whAdr) + '\x08\x13'
+        ans = self.cmdWR(whPPLRCmd)
+        try:
+            PPLR = {
+                    'HiB':ans[1],
+                    'LoB':ans[2],
+                    'Status':bin(int(ans[3], 16))[2:],
+                    'H':chSim(ans[4]),
+                    'M':chSim(ans[5]),
+                    'd':chSim(ans[6]),
+                    'm':chSim(ans[7]),
+                    'y':chSim(ans[8]),
+                    'Period':int(ans[9], 16),
+                    }
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение последней записи профиля мощности! Причина: %s' % e)
+            PPLR = False
+        return PPLR
     
     
-    def whMPVal(self, whAdr=0, HiB='00', LoB='00'):
-        """
-            Метод предназначен для чтения записи средних мощностей по определенному адресу,
-            возвращает словарь с ключами:
-                        'Status' - байт-статус записи (см. описание протокола)
-                        'H' - час фиксации
-                        'M' - минута фиксации
-                        'd' - день фиксации
-                        'm' - месяц фиксации
-                        'y' - год фиксации
-                        'Period' - период интегрирования мощности
-                        'A' - активная мощность
-                        'R' - реактивная мощность
-            Принимает в качетсве параметров сетевой адрес прибора учет, старший байт адреса, младший байт адреса
+    def whPPValue(self, whAdr=0, HiB='00', LoB='00'):
+        """Method is intended for reading value of power profile by given record address
+        
+        Sends command to read the value of power profile by given record address
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            HiB (str): high byte records addres, default value - 00.
+            LoB (str): low byte records addres, default value - 00.
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                HiB :(str) high byte records addres.
+                LoB :(str) low byte records addres.
+                Status: (str) binary representation of records status (check protocol), e.g. 11001.
+                H: (str) records Hour fixation.
+                m: (str) records Minute fixation.
+                d: (str) records Day fixation.
+                m: (str) records Month fixation.
+                y: (str) records Year fixation.
+                Period: (int) power discreteness.
+                A :(float) active energy value.
+                R :(float) reactive energy value.
+        
+        Examples:
+            
+            >>> PPVal = merc.whPPValue(whAdr=145, HiB='49', LoB='30')
+            >>> print 'Last Record Status: %s, Period: %s, A: %s, R: %s, DateTime: %s-%s-%s %s:%s' % \
+            (PPVal['Status'], PPVal['Period'], PPVal['A'], PPVal['R'], PPVal['d'], PPVal['m'], PPVal['y'], PPVal['H'], PPVal['M'])
+            Last Record Status: 1001, Period: 30, A: 0.0, R: 0.0, DateTime: 16-06-15 12:30
         """
         
-
+        PPVal = {}
         chByte = lambda x: chr(int(x, 16))
-        whMPValCmd = chr(whAdr) + '\x06\x03' + chByte(HiB) + chByte(LoB) + '\x0F'
-        ans = self.cmdWR(whMPValCmd)
-        MPVal = {
-                'Status':bin(int(ans[1], 16))[2:],
-                'H':chSim(ans[2]),
-                'M':chSim(ans[3]),
-                'd':chSim(ans[4]),
-                'm':chSim(ans[5]),
-                'y':chSim(ans[6]),
-                'Period':int(ans[7], 16),
-                'A':int(ans[9]+ans[8], 16)*0.001,
-                'R':int(ans[13]+ans[12], 16)*0.001
-                }
-        return MPVal
+        whPPValCmd = chr(whAdr) + '\x06\x03' + chByte(HiB) + chByte(LoB) + '\x0F'
+        ans = self.cmdWR(whPPValCmd)
+        try:
+            PPVal = {
+                    'Status':bin(int(ans[1], 16))[2:],
+                    'H':chSim(ans[2]),
+                    'M':chSim(ans[3]),
+                    'd':chSim(ans[4]),
+                    'm':chSim(ans[5]),
+                    'y':chSim(ans[6]),
+                    'Period':int(ans[7], 16),
+                    'A':int(ans[9]+ans[8], 16)*0.001,
+                    'R':int(ans[13]+ans[12], 16)*0.001
+                    }
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение записи профиля мощности по адресу 0x%s%s! Причина: %s' % (HiB,LoB,e))
+            PPVal = False
+        return PPVal
     
     
     def whMPDVal(self, whAdr=0, deep=1):
