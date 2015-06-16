@@ -336,7 +336,7 @@ class m230():
                 (PPLR['Status'], PPLR['Period'], PPLR['HiB'], PPLR['LoB'], PPLR['d'], PPLR['m'], PPLR['y'], PPLR['H'], PPLR['M'])
             Last Record Status: 11001, Period: 30, High Byte: 49, Low Byte: 30, DateTime: 16-06-15 12:30
         """
-        
+    
         whPPLRCmd = chr(whAdr) + '\x08\x13'
         ans = self.cmdWR(whPPLRCmd)
         try:
@@ -370,6 +370,7 @@ class m230():
         
         Returns:
         
+            
             dict: with key: (type) value.
                 HiB :(str) high byte records addres.
                 LoB :(str) low byte records addres.
@@ -385,18 +386,18 @@ class m230():
         
         Examples:
             
-            >>> PPVal = merc.whPPValue(whAdr=145, HiB='49', LoB='30')
-            >>> print 'Last Record Status: %s, Period: %s, A: %s, R: %s, DateTime: %s-%s-%s %s:%s' % \
+            >>> PPVal = merc.whPPValue(whAdr=145, HiB='48', LoB='E0')
+            >>> print 'Record Status: %s, Period: %s, A: %s, R: %s, DateTime: %s-%s-%s %s:%s' % \
             (PPVal['Status'], PPVal['Period'], PPVal['A'], PPVal['R'], PPVal['d'], PPVal['m'], PPVal['y'], PPVal['H'], PPVal['M'])
             Last Record Status: 1001, Period: 30, A: 0.0, R: 0.0, DateTime: 16-06-15 12:30
         """
         
-        PPVal = {}
+        
         chByte = lambda x: chr(int(x, 16))
         whPPValCmd = chr(whAdr) + '\x06\x03' + chByte(HiB) + chByte(LoB) + '\x0F'
         ans = self.cmdWR(whPPValCmd)
         try:
-            PPVal = {
+            PPV = {
                     'Status':bin(int(ans[1], 16))[2:],
                     'H':chSim(ans[2]),
                     'M':chSim(ans[3]),
@@ -409,60 +410,279 @@ class m230():
                     }
         except Exception, e:
             logging.error(u'Не удалось выполнить чтение записи профиля мощности по адресу 0x%s%s! Причина: %s' % (HiB,LoB,e))
-            PPVal = False
-        return PPVal
+            PPV = False
+        return PPV
     
     
-    def whMPDVal(self, whAdr=0, deep=1):
-        """
-            Метод предназначен для чтения записи средних мощностей на определенную глубину,
-            возвращает словарь с ключами:
-                        'Status' - байт-статус записи (см. описание протокола)
-                        'H' - час фиксации
-                        'M' - минута фиксации
-                        'd' - день фиксации
-                        'm' - месяц фиксации
-                        'y' - год фиксации
-                        'Period' - период интегрирования мощности
-                        'A' - активная мощность
-                        'R' - реактивная мощность
-            Принимает в качетсве параметров сетевой адрес прибора учет, глубину опроса
+    def whPPDepthValue(self, whAdr=0, depth=1):
+        """Method is intended for reading value of power profile by given record address on given depth
+        
+        Sends command to read the value of power profile by given record address on given depth.
+        Discreteness of power profile records - 0x10
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            depth (int): depth of requests, e.g. depth=48 equal for power profile for 24 hours ago.
+        
+        Returns:
+        
+            dict of dict: with key: (type) value.
+                HiB :(str) high byte records addres.
+                LoB :(str) low byte records addres.
+                Status: (str) binary representation of records status (check protocol), e.g. 11001.
+                H: (str) records Hour fixation.
+                m: (str) records Minute fixation.
+                d: (str) records Day fixation.
+                m: (str) records Month fixation.
+                y: (str) records Year fixation.
+                Period: (int) power discreteness.
+                A :(float) active energy value.
+                R :(float) reactive energy value.
+        
+        Examples:
+            
+            >>> PPVal = merc.whPPDepthValue(whAdr=145, depth=48)
+            >>> if PPVal:
+                    for i in PPVal.values():
+                        print 'Status: %s DateTime: %s.%s.%s %s:%s Period: %d A: %.3f R: %.3f' % \
+                        (i['Status'], i['d'], i['m'], i['y'], i['H'], i['M'], i['Period'], i['A'], i['R'])
+                Status: 1001 DateTime: 16.06.15 14:30 Period: 30 A: 0.000 R: 0.000
         """
         
-        MPDVal = {}
-        lastMPLR = self.whMPLR(whAdr)
-        ADR = int(lastMPLR['HiB']+lastMPLR['LoB'], 16)
-        for i in range(0, deep):
-            ADRH = hex(ADR)[2:]
-            ADRres = {
-                1: '0000',
-                2: '00'+str(ADRH[0:]),
-                3: '0'+str(ADRH[0:]),
-                4: str(ADRH[0:])
-            }.get(len(ADRH))
-            ADRHi = ADRres[0:2]
-            ADRLo = ADRres[2:]
-            ans = self.whMPVal(whAdr, ADRHi, ADRLo)
-            MPDVal[i] = ans
-            ADR = ADR - 16
-            if ADR == 0: ADR = 65520
-        return MPDVal
+        PPDV = {}
+        ADR = None
+        try:
+            PPLR = self.whPPLastRecord(whAdr)
+            ADR = int(PPLR['HiB']+PPLR['LoB'], 16)
+        except Exception, e:
+            logging.error(u'Не удалось выполнить чтение последней записи профиля мощности для расчета глубины опроса! Причина: %s' % (e))
+            PPDVres = False
+   
+        if ADR:    
+            for i in range(0, depth):
+                ADRH = hex(ADR)[2:]
+                ADRres = {
+                    1: '0000',
+                    2: '00'+str(ADRH[0:]),
+                    3: '0'+str(ADRH[0:]),
+                    4: str(ADRH[0:])
+                }.get(len(ADRH))
+                ADRHi = ADRres[0:2]
+                ADRLo = ADRres[2:]
+                ans = self.whPPValue(whAdr, ADRHi, ADRLo)
+                if ans:
+                    PPDV[i] = ans
+                else:
+                    logging.error(u'Не удалось выполнить чтение записи профиля мощности по адресу 0x%s%s на шаге %d!' % (ADRHi,ADRLo,i))
+                ADR = ADR - 16
+                if ADR == 0: ADR = 65520
+            PPDVres = PPDV
+        return PPDVres
+
+
+    def whU(self, whAdr):
+        """Method is intended for reading instantaneous values of Voltage (V)
+        
+        Sends command to read the instantaneous values of Voltage (V)
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                1 :(float) phase 1 voltage.
+                2 :(float) phase 2 voltage.
+                3 :(float) phase 3 voltage.
+                
+        Examples:
+        
+            >>> U = merc.whU(whAdr=145)
+            >>> print 'U1: %s, U2: %s U3: %s' % (U[1],U[2],U[3],)
+            U1: 207.37 U2: 0.0 U3: 14.08
+        """
+        
+        U = {}
+        ph = {1:'\x11', 2:'\x12', 3:'\x13',}
+        for p in ph:
+            whUCmd = chr(whAdr) + '\x08\x11' + ph[p]
+            ans = self.cmdWR(whUCmd)
+            try:
+                U[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
+            except Exception, e:
+                logging.error(u'Не удалось выполнить чтение значения напряжения фазы %d! Причина: %s' % (p,e))
+                U[p] = None
+        return U
+    
+    def whUAngle(self, whAdr):
+        """Method is intended for reading angles between the voltages
+        
+        Sends command to read the angles between the voltages
+        !!! Not tested on real device !!!
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                12 :(float) angle between phase 1 and 2 voltages.
+                13 :(float) angle between phase 1 and 3 voltages.
+                23 :(float) angle between phase 2 and 3 voltages.
+                
+        Examples:
+        
+            >>> A = merc.whUAngle(whAdr=145)
+            >>> print 'A12: %s, A13: %s A23: %s' % (A[12],A[13],A[23],)
+            A12: 120, A13: 240 A23: 120
+        """
+        ph = {12:'\x51', 13:'\x52', 23:'\x53',}
+        UAn = {}
+        for p in ph:
+            whUAnCmd = chr(whAdr) + '\x08\x11' + ph[p]
+            ans = self.cmdWR(whUAnCmd)
+            if ans[0:4] != [hex(whAdr)[2:], 'ff', 'ff', 'ff']:
+                try:
+                    UAn[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
+                except Exception, e:
+                    logging.error(u'Не удалось выполнить чтение значения угла между фазами %d! Причина: %s' % (p,e))
+                    UAn[p] = None
+            else:
+                logging.error(u'Не удалось выполнить чтение значения угла между фазами %d! Причина: отсутствует нагрузка' % (p))
+                UAn[p] = None
+        return UAn
+
+    
+    def whI(self, whAdr):
+        """Method is intended for reading instantaneous values of amperage (A)
+        
+        Sends command to read the instantaneous values of amperage (A)
+        !!! Not tested on real device !!!
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                1 :(float) phase 1 amperage.
+                2 :(float) phase 2 amperage.
+                3 :(float) phase 3 amperage.
+                
+        Examples:
+        
+            >>> I = merc.whI(whAdr=145)
+            >>> print 'I1: %s, I2: %s I3: %s' % (I[1],I[2],I[3],)
+            I1: 1.37 I2: 2.0 I3: 1.08
+        """
+        ph = {1:'\x21', 2:'\x22', 3:'\x23',}
+        I = {}
+        for p in ph:
+            whICmd = chr(whAdr) + '\x08\x11' + ph[p]
+            ans = self.cmdWR(whICmd)
+            try:
+                I[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
+            except Exception, e:
+                logging.error(u'Не удалось выполнить чтение значения тока фазы %d! Причина: %s' % (p,e))
+                I[p] = None
+        return I
+    
+    def whP(self, whAdr, en='P'):
+        """Method is intended for reading instantaneous values of power
+        
+        Sends command to read the instantaneous values of power
+        !!! Not tested on real device !!!
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            en (str): type energy. P - active, Q - reactive, S - full 
+        
+        Returns:
+        
+            dict: with key: (type) value.
+                0 :(float) total power.
+                1 :(float) phase 1 power.
+                2 :(float) phase 2 power.
+                3 :(float) phase 3 power.
+                
+        Examples:
+        
+            >>> I = merc.whP(whAdr=145, en='P')
+            >>> print 'P1: %.2f, P2: %.2f P3: %.2f' % (P[1],P[2],P[3],)
+            P1: 0.00, P2: 0.00 P3: 0.00
+        """
+        ph = {
+            'P':{0:'\x00', 1:'\x21', 2:'\x22', 3:'\x23',},
+            'Q':{0:'\x04', 1:'\x05', 2:'\x06', 3:'\x07',},
+            'S':{0:'\x08', 1:'\x09', 2:'\x0A', 3:'\x0B',},
+        }
+        P = {}
+        for p in ph[en]:
+            whPCmd = chr(whAdr) + '\x08\x11' + ph[en][p]
+            ans = self.cmdWR(whPCmd)
+            try:
+                P[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
+            except Exception, e:
+                logging.error(u'Не удалось выполнить чтение значения мощности фазы %d! Причина: %s' % (p,e))
+                P[p] = None
+        return P
+    
+    def whCosf(self, whAdr, en='P'):
+        """Method is intended for reading instantaneous values of power factor
+        
+        Sends command to read the instantaneous values of power factor
+        !!! Not tested on real device !!!
+        
+        Args:
+        
+            whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
+            en (str): type energy. P - active, Q - reactive, S - full 
+            
+        Returns:
+        
+            dict: with key: (type) value.
+                0 :(float) total power.
+                1 :(float) phase 1 power.
+                2 :(float) phase 2 power.
+                3 :(float) phase 3 power.
+                
+        Examples:
+        
+            >>> C = merc.whCosf(wh_adr_set)
+            >>> print 'C1: %.2f, C2: %.2f C3: %.2f' % (C[1],C[2],C[3],)
+            C1: 0.97 C2: 0.89 C3: 0.76
+        """
+        ph = {0:'\x30', 1:'\x31', 2:'\x32', 3:'\x33',}
+        Cosf = {}
+        for p in ph:
+            whCosfCmd = chr(whAdr) + '\x08\x11' + ph[p]
+            ans = self.cmdWR(whCosfCmd)
+            try:
+                Cosf[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
+            except Exception, e:
+                logging.error(u'Не удалось выполнить чтение значения к-та мощности фазы %d! Причина: %s' % (p,e))
+                Cosf[p] = None
+        return Cosf
+    
+    def whTestCMD(self, cmd='', useAdr=True, whAdr=0, Prefix='', HiB='', LoB='', Postfix=''):
+        """Test method, for experiments. Developer only!
+        """
+        if useAdr:
+            chByte = lambda x: chr(int(x, 16))
+            whCmd = chr(whAdr) + Prefix + chByte(HiB) + chByte(LoB) + Postfix
+            ans = self.cmdWR(whCmd)    
+        else:
+            ans = self.cmdWR(cmd)
+
+        return ans
     
     def whMPDValFast(self, whAdr=0, deep=1):
-        """
-            !!! Тестовый метод для ускоренного чтения профиля, непосредственно по ячейкам памяти прибора!
-            Метод предназначен для чтения записи средних мощностей на определенную глубину,
-            возвращает словарь с ключами:
-                        'Status' - байт-статус записи (см. описание протокола)
-                        'H' - час фиксации
-                        'M' - минута фиксации
-                        'd' - день фиксации
-                        'm' - месяц фиксации
-                        'y' - год фиксации
-                        'Period' - период интегрирования мощности
-                        'A' - активная мощность
-                        'R' - реактивная мощность
-            Принимает в качетсве параметров сетевой адрес прибора учет, глубину опроса
+        """Test method for fast power profile reading 
         """
         
         MPDVal = {}
@@ -483,124 +703,6 @@ class m230():
             ADR = ADR + 224
             if ADR == 65408: ADR = 0
         return MPDVal
-    
-    """
-        Мгновенные значения
-    """
-    def whU(self, whAdr):
-        """
-            Метод предназначен для чтения мгновенных значений напряжения (В).
-            возвращает словарь с ключами:
-            1 - по фазе 1
-            2 - по фазе 2
-            3 - по фазе 3
-            Принимает в качестве параметров сетевой адрес счетчика
-        """
-        ph = {1:'\x11', 2:'\x12', 3:'\x13',}
-        U = {}
-        for p in ph:
-            whUCmd = chr(whAdr) + '\x08\x11' + ph[p]
-            ans = self.cmdWR(whUCmd)
-            U[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
-        return U
-    
-    def whUAngle(self, whAdr):
-        """
-            Метод предназначен для чтения углов между фазными напряжениями.
-            Возвращает словарь с ключами:
-            12 - угол между фазными напряжениями 1 и 2 фаз
-            13 - 1 и 3 фаз
-            23 - 2 и 3 фаз
-            
-            !!! Необходимо тестирование под нагрузкой
-        """
-        ph = {12:'\x51', 13:'\x52', 23:'\x53',}
-        UAn = {}
-        for p in ph:
-            whUAnCmd = chr(whAdr) + '\x08\x11' + ph[p]
-            ans = self.cmdWR(whUAnCmd)
-            UAn[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
-        return UAn
-
-    
-    def whI(self, whAdr):
-        """
-            Метод предназначен для чтения мгновенных значений тока (А).
-            возвращает словарь с ключами:
-            1 - по фазе 1
-            2 - по фазе 2
-            3 - по фазе 3
-            Принимает в качестве параметров сетевой адрес счетчика
-            
-            !!! Необходимо тестирование под нагрузкой
-        """
-        ph = {1:'\x21', 2:'\x22', 3:'\x23',}
-        I = {}
-        for p in ph:
-            whICmd = chr(whAdr) + '\x08\x11' + ph[p]
-            ans = self.cmdWR(whICmd)
-            I[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
-        return I
-    
-    def whP(self, whAdr, en='P'):
-        """
-            Метод предназначен для чтения мгновенных значений мощности.
-            P - активная мощность (кВт)
-            Q - реактивная мощность (кВар)
-            S - полная мощность (кВА)
-            возвращает словарь с ключами:
-            0 - мощность по сумме фаз
-            1 - по фазе 1
-            2 - по фазе 2
-            3 - по фазе 3
-            Принимает в качестве параметров сетевой адрес счетчика, вид мощности('P'(по-умолчанию), 'Q', 'S')
-            
-            !!! Необходимо тестирование под нагрузкой
-        """
-        ph = {
-            'P':{0:'\x00', 1:'\x21', 2:'\x22', 3:'\x23',},
-            'Q':{0:'\x04', 1:'\x05', 2:'\x06', 3:'\x07',},
-            'S':{0:'\x08', 1:'\x09', 2:'\x0A', 3:'\x0B',},
-        }
-        P = {}
-        for p in ph[en]:
-            whPCmd = chr(whAdr) + '\x08\x11' + ph[en][p]
-            ans = self.cmdWR(whPCmd)
-            P[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
-        return P
-    
-    def whCosf(self, whAdr, en='P'):
-        """
-            Метод предназначен для чтения мгновенных значений коэффициента мощности.
-            возвращает словарь с ключами:
-            0 - мощность по сумме фаз
-            1 - по фазе 1
-            2 - по фазе 2
-            3 - по фазе 3
-            Принимает в качестве параметров сетевой адрес счетчика
-            
-            !!! Необходимо тестирование под нагрузкой
-        """
-        ph = {0:'\x30', 1:'\x31', 2:'\x32', 3:'\x33',}
-        Cosf = {}
-        for p in ph:
-            whCosfCmd = chr(whAdr) + '\x08\x11' + ph[p]
-            ans = self.cmdWR(whCosfCmd)
-            Cosf[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
-        return Cosf
-    
-    def whTestCMD(self, cmd='', useAdr=True, whAdr=0, Prefix='', HiB='', LoB='', Postfix=''):
-        """
-            Тестовая посылка, для экспериментов
-        """
-        if useAdr:
-            chByte = lambda x: chr(int(x, 16))
-            whCmd = chr(whAdr) + Prefix + chByte(HiB) + chByte(LoB) + Postfix
-            ans = self.cmdWR(whCmd)    
-        else:
-            ans = self.cmdWR(cmd)
-
-        return ans
       
 
 

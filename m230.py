@@ -27,31 +27,23 @@ if merc.whAuth(wh_adr_set, 111111, 1):
     print 'WhNum: ' + merc.whNum(wh_adr_set)
     whTime = merc.whTime(wh_adr_set, datetimefrmt='%Y-%m-%d %H:%M:%S')
     
-    PPLR = merc.whPPValue(wh_adr_set, '49', '30')
-    if PPLR:
-        print 'Last Record Status: %s, Period: %s, A: %s, R: %s, DateTime: %s-%s-%s %s:%s' % \
-        (PPLR['Status'], PPLR['Period'], PPLR['A'], PPLR['R'], PPLR['d'], PPLR['m'], PPLR['y'], PPLR['H'], PPLR['M'])
-    else:
-        print '!!!!'
-    
-    """
+
     print '--------------- U -------------'
     U = merc.whU(wh_adr_set)
-    print "U1: " + str(U[1]) + " U2: " + str(U[2]) + " U3: " + str(U[3])
+    print repr(U)
+    print 'U1: %s, U2: %s U3: %s' % (U[1],U[2],U[3],)
+    
+    A = merc.whUAngle(whAdr=145)
+    print 'A12: %s, A13: %s A23: %s' % (A[12],A[13],A[23],)
     
     print '--------------- I -------------'
     I = merc.whI(wh_adr_set)
     print "I1: " + str(I[1]) + " I2: " + str(I[2]) + " I3: " + str(I[3])
-    """
-    """
-    MPDV = merc.whMPDVal(wh_adr_set, 48)
     
-    for i in MPDV.values():
-        print '-----------------------------------------------------------------------'
-        print 'Status: %s DateTime: %s.%s.%s %s:%s Period: %d A: %.3f R: %.3f' % (i['Status'], i['d'], i['m'], i['y'], i['H'], i['M'], i['Period'], i['A'], i['R'])
-    """
-    #test = merc.whTestCMD(useAdr = True, whAdr = wh_adr_set, Prefix='\x06\x83', HiB='ff', LoB='80', Postfix='\xD2')
-    #test = merc.whMPDValFast(wh_adr_set, 20)
+    C = merc.whCosf(wh_adr_set)
+    print 'C1: %.2f, C2: %.2f C3: %.2f' % (C[1],C[2],C[3],)
+    print repr(C) 
+
     merc.whLogOut(wh_adr_set)
     
 #channel.terminate()
