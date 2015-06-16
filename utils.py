@@ -3,8 +3,6 @@
 import time
 import datetime
 
-from CRC16 import CRC16 as CRCM230
-
 def chSim(sim):
     sim = sim
     if len(sim)==1: sim = "0" + sim

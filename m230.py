@@ -16,9 +16,9 @@ wh_adr_set1 = 43
 channel = DC('/dev/ttyUSB0', whTimeout=2)
 merc = m230(channel)
 """
-wh_adr_set = 22
-channel = GSM('/dev/ttyUSB0', phone_number = '89659334537')
-#channel = DC(port = '/dev/ttyUSB0', whTimeout=2)
+wh_adr_set = 145
+#channel = GSM('/dev/ttyUSB0', phone_number = '89659334537')
+channel = DC(port = '/dev/ttyUSB0', whTimeout=2)
 
 
 merc = m230(channel)
@@ -26,7 +26,13 @@ merc = m230(channel)
 if merc.whAuth(wh_adr_set, 111111, 1):
     print 'WhNum: ' + merc.whNum(wh_adr_set)
     whTime = merc.whTime(wh_adr_set, datetimefrmt='%Y-%m-%d %H:%M:%S')
-    print 'WhTime: ' + whTime['DateTime']
+    
+    PPLR = merc.whPPValue(wh_adr_set, '49', '30')
+    if PPLR:
+        print 'Last Record Status: %s, Period: %s, A: %s, R: %s, DateTime: %s-%s-%s %s:%s' % \
+        (PPLR['Status'], PPLR['Period'], PPLR['A'], PPLR['R'], PPLR['d'], PPLR['m'], PPLR['y'], PPLR['H'], PPLR['M'])
+    else:
+        print '!!!!'
     
     """
     print '--------------- U -------------'
@@ -45,8 +51,10 @@ if merc.whAuth(wh_adr_set, 111111, 1):
         print 'Status: %s DateTime: %s.%s.%s %s:%s Period: %d A: %.3f R: %.3f' % (i['Status'], i['d'], i['m'], i['y'], i['H'], i['M'], i['Period'], i['A'], i['R'])
     """
     #test = merc.whTestCMD(useAdr = True, whAdr = wh_adr_set, Prefix='\x06\x83', HiB='ff', LoB='80', Postfix='\xD2')
-    test = merc.whMPDValFast(wh_adr_set, 20)
-channel.terminate()
+    #test = merc.whMPDValFast(wh_adr_set, 20)
+    merc.whLogOut(wh_adr_set)
+    
+#channel.terminate()
 """
 channel = GSM('/dev/ttyUSB0')
 channel.GSMCall('89659334537')
