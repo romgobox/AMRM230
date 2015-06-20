@@ -9,7 +9,7 @@ from dev_channel import DirectChannel as DC
 from dev_channel import GSMChannel as GSM
 
 
-
+test
 """
 wh_adr_set = 145
 wh_adr_set1 = 43
