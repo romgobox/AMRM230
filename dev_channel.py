@@ -297,7 +297,7 @@ class TCPChannel(object):
                 logging.error(u'Соединение не установлено. Причина: ' % e)
 
     
-    def disconnect(self):
+    def terminate(self):
         self.sock.close()
         return True
     
