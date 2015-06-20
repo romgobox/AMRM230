@@ -3,6 +3,7 @@
 
 import subprocess
 import socket
+import sys
 import time
 import datetime
 import serial
@@ -251,63 +252,53 @@ class TCPChannel(object):
     
     def __init__(self, address, port, whTimeout = 5, attempt = 3, whType=0, connect_attempt=3):
         """
-        Открывает прямой канал (как правило по протоколу RS-485) до счетчика.
+        Открывает канал TCP до счетчика.
         whType:
             0 - Меркурий 230
         """
+        
+        self.address = address
         self.port = port
-        self.ser = ser
-        self.ser.port = port
-        self.ser.baudrate = baudrate
-        self.ser.bytesize = bytesize
-        self.ser.parity = parity
-        self.ser.stopbits = stopbits
-        self.ser.timeout = timeout
-        self.ser.writeTimeout = writeTimeout
         self.whTimeout = whTimeout
         self.attempt = attempt
-        self.phone_number = phone_number
-        self.call_attempt = call_attempt
+        self.connect_attempt = connect_attempt
         
         typeCRC = {
             0: CRC_M230(True),
         }
         self.CRC = typeCRC[whType]
-        """
-        """
-    
-        try:
-            self.ser.open()
-        except Exception:
-            logging.error(u'Не удалось открыть порт: ' + self.port)
-        else:
-            logging.debug(u'Инициализация порта: ' + self.port)
+        
             
         try:
-            self.call(self.phone_number, self.call_attempt)
-        except Exception:
-            logging.error(u'Не удалось установить соединение, завершаем работу скрипта!')
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        except socket.error:
+            logging.error(u'Не удалось создать сокет!')
             self.terminate()
         
+        try:
+            self.connect(self.address, self.port, self.connect_attempt)
+            logging.debug(u'Соединение установлено!')
+        except socket.error, msg:
+            sys.exit()
         
-    def call(self, phone_number = '', call_attempt = 3):
+        
+        
+    def connect(self, address, port, connect_attempt):
         callCmd = 'ATD'+phone_number+'\r'
         
-        while call_attempt>0:
-            logging.debug(u'Звоним на номер: ' + phone_number)
-            callAns = self.modemTXRX(callCmd, 15)
-            if 'CONNECT 9600' in callAns[1]:
-                logging.debug(u'Соединение с модемом установлено')
+        while connect_attempt>0:
+            logging.debug(u'Устанавливаем соединение: %s:%s' % (address, port))
+            try:
+                connection = self.sock.connect((address, port))
                 call_attempt = 0
                 return True
-            elif 'NO CARRIER' in callAns[1]:
-                logging.error(u'Соединение с модемом не установлено')
+            except socket.error, e:
                 call_attempt -= 1
+                logging.error(u'Соединение не установлено. Причина: ' % e)
+
     
-    def terminate(self):
-        self.modemTXRX('+++', 1)
-        time.sleep(0.5)
-        self.modemTXRX('ATH\r', 1)
+    def disconnect(self):
+        self.sock.close()
         return True
     
     def modemTXRX(self, cmd, modemTimeout=5):
@@ -387,11 +378,14 @@ class TCPChannel(object):
             cmdTX[0] - список, отправленная команда в 16-м представлении
             cmdTX[1] - количество отправленных байт
         """
-        self.ser.write(cmd)
+        try:
+            self.sock.sendall(cmd)
+        except socket.error, msg:
+            logging.error(u'Ошибка отправки данных: %s. Причина: %s' % (cmd, msg))            
         cmdsend = [chSim(hex(ord(x))[2:]) for x in cmd]
         cmdTX = [cmdsend, len(cmdsend)]
         return cmdTX
         
     def RX(self):      
-        return self.ser.read(self.ser.inWaiting())
+        return self.sock.recv(100)
 
