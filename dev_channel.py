@@ -282,7 +282,7 @@ class TCPChannel(object):
             sys.exit()
         
         
-        
+	#dev_chan brach        
     def connect(self, address, port, connect_attempt):
         
         while connect_attempt>0:
