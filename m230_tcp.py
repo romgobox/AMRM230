@@ -14,7 +14,7 @@ from dev_channel import TCPChannel as TCP
 
 wh_adr_set = 16
 
-channel = TCP(address = '192.168.1.12', port = 5555, whTimeout=2)
+channel = TCP(address = '192.168.0.123', port = 5555, whTimeout=2)
 
 
 merc = m230(channel)

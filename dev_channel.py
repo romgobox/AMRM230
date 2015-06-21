@@ -284,16 +284,15 @@ class TCPChannel(object):
         
         
     def connect(self, address, port, connect_attempt):
-        callCmd = 'ATD'+phone_number+'\r'
         
         while connect_attempt>0:
             logging.debug(u'Устанавливаем соединение: %s:%s' % (address, port))
             try:
                 connection = self.sock.connect((address, port))
-                call_attempt = 0
+                connect_attempt = 0
                 return True
             except socket.error, e:
-                call_attempt -= 1
+                connect_attempt -= 1
                 logging.error(u'Соединение не установлено. Причина: ' % e)
 
     
@@ -301,38 +300,7 @@ class TCPChannel(object):
         self.sock.close()
         return True
     
-    def modemTXRX(self, cmd, modemTimeout=5):
-        
-        ansHex = []
-        answer = []
-        ansChr=''
-        cmdTX = self.modemTX(cmd)
-        logging.debug(u'TX >>> ' + " ".join(cmdTX[0]) + ' <<<>>> ' + cmdTX[1] + ' [' + str(cmdTX[2]) +'] ')
-        time.sleep(modemTimeout)
-        ansChr += self.modemRX()
-        ansHex += [chSim(hex(ord(x))[2:]) for x in ansChr]
-        cmdRX = [ansHex, ansChr, len(ansHex)]
-        logging.debug(u'RX <<< ' + " ".join(cmdRX[0]) + ' <<<>>> ' + cmdRX[1] + ' [' + str(cmdRX[2]) +'] ')
-        answer = [ansHex, ansChr]
-
-        return answer
-    
-    def modemTX(self, cmd):
-        """
-            Метод предназначен для отправки данных в порт
-            Принимает в качестве параметров команду
-            Возвращает список:
-            cmdTX[0] - список, отправленная команда в 16-м представлении
-            cmdTX[1] - количество отправленных байт
-        """
-        self.ser.write(cmd)
-        cmdsend = [chSim(hex(ord(x))[2:]) for x in cmd]
-        cmdTX = [cmdsend, cmd, len(cmdsend)]
-        return cmdTX
-        
-    def modemRX(self):      
-        return self.ser.read(self.ser.inWaiting())
-        
+      
     
     def TXRX(self, cmd, byteExpected=0):
         answer = []
@@ -379,7 +347,7 @@ class TCPChannel(object):
             cmdTX[1] - количество отправленных байт
         """
         try:
-            self.sock.sendall(cmd)
+            self.sock.send(cmd)
         except socket.error, msg:
             logging.error(u'Ошибка отправки данных: %s. Причина: %s' % (cmd, msg))            
         cmdsend = [chSim(hex(ord(x))[2:]) for x in cmd]
@@ -387,5 +355,5 @@ class TCPChannel(object):
         return cmdTX
         
     def RX(self):      
-        return self.sock.recv(100)
+        return self.sock.recv(16)
 

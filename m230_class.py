@@ -596,7 +596,7 @@ class m230():
         
         Sends command to read the instantaneous values of power
         !!! Not tested on real device !!!
-        
+
         Args:
         
             whAdr (int): the metering device address, for Mercury 230 from 1 to 240, 0 corresponds to the address of any device on the bus.
