@@ -12,7 +12,7 @@ from dev_channel import TCPChannel as TCP
 
 
 
-wh_adr_set_list = [29,]
+wh_adr_set_list = [34,]
 
 channel = TCP(address = '192.168.0.123', port = 55555, whTimeout=15)
 #channel = TCP(address = '192.168.0.122', port = 15555, whTimeout=15)
