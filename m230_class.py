@@ -56,7 +56,8 @@ class m230():
 		whAuthCmd = chr(whAdr) + '\x01' + chr(whLevAuth) + whPass_chr
 		logging.debug(u'Соединение со счетчиком %s и паролем %s:' % (str(whAdr), str(whPass)))
 		authAns = self.cmdWR(whAuthCmd)
-		if authAns[0:2] == [chSim(hex(whAdr)[2:]), '00']:
+		#if authAns[0:2] == [chSim(hex(whAdr)[2:]), '00']:
+		if self._whAnsCheck(whAdr, authAns):
 			logging.debug(u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass)))
 			auth = True
 		else:
@@ -68,7 +69,7 @@ class m230():
 	def whLogOut(self, whAdr=0):
 		"""Method to close the connection with the meter
 		
-		Sends command to close the connection with the meter
+		Sends command to close the connection with the metering device
 		
 		Args:
 		
@@ -85,9 +86,36 @@ class m230():
 		"""
 
 		logOutCmd = chr(whAdr) + '\x02'
+		logging.info(u'Разрываем соединение с прибром учета: %s' % str(whAdr))
 		logOutAns = self.cmdWR(logOutCmd)
-		return True
-		
+		#if logOutAns[0:2] == [chSim(hex(whAdr)[2:]), '00']:
+		if self._whAnsCheck(whAdr, logOutAns):
+			logging.debug(u'Соединение со счетчиком %s разорвано!' % (str(whAdr), ))
+			logOut = True
+		else:
+			logging.error(u'Не удалось установить разорвать соединение со счетчиком %s' % str(whAdr))
+			logOut = False
+		return logOut
+	
+	def _whAnsCheck(self, whAdr=0, ansCmd=[]):
+		whAnsDict = {
+		'00':u'Все нормально',
+		'01':u'Недопустимая команда или параметр',
+		'02':u'Внутренняя ошибка счетчика',
+		'03':u'Не достаточен уровень доступа для удовлетворения запроса',
+		'04':u'Внутренние часы счетчика уже корректировались в течение текущих су¬ток',
+		'05':u'Не открыт канал связи',
+		}
+		if not ansCmd:
+			logging.error(u'Для анализа ответа дана пустая строка!')
+			return False
+		else:
+			if (ansCmd[0]==chSim(hex(whAdr)[2:]) and len(ansCmd)>4) or ansCmd[0:2] == [chSim(hex(whAdr)[2:]), '00']:
+				return True
+			else:
+				logging.error(whAnsDict[ansCmd[1]])
+				return False
+	
 	def whNum(self, whAdr=0):
 		"""Method is intended to read the serial number of the metering device
 		
@@ -106,15 +134,17 @@ class m230():
 			>>> m230.whNum (whAdr = 145)
 			11199145
 		"""
-		
+		whNum = False
 		whNumCmd = chr(whAdr) + '\x08\x00'
+		logging.info(u'Чтение серийного номера прибора учета: %s' % str(whAdr))
 		ans = self.cmdWR(whNumCmd)
-		try:
-			whN = [chSim(str(int(x, 16))) for x in ans[1:5]]
-			whNum = "".join(whN)
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение серийного номера прибора учета! Причина: %s' % e)
-			whNum = False
+		if self._whAnsCheck(whAdr, ans):
+			try:
+				whN = [chSim(str(int(x, 16))) for x in ans[1:5]]
+				whNum = "".join(whN)
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение серийного номера прибора учета! Причина: %s' % e)
+				whNum = False
 		return whNum
 		
    
@@ -139,17 +169,20 @@ class m230():
 			Device datetime: 2015-06-16 10:00:44, Season: 1, Time difference: 3523
 		"""
 		
+		whDateTime = False
 		whTimeCmd = chr(whAdr) + '\x04\x00'
+		logging.info(u'Чтение текущей даты и времени прибора учета: %s' % str(whAdr))
 		ans = self.cmdWR(whTimeCmd)
-		try:
-			time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
-			whDateForm = time.strftime(datetimefrmt, time_tuple)
-			whSeason = int(ans[-3])
-			whTimeDelta = datetime.strptime(whDateForm, datetimefrmt) - datetime.now()
-			whDateTime = {'DateTime': whDateForm, 'Season': whSeason, 'TimeDiff':whTimeDelta.seconds}
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение времени прибора учета! Причина: %s' % e)
-			whDateTime = False
+		if self._whAnsCheck(whAdr, ans):
+			try:
+				time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
+				whDateForm = time.strftime(datetimefrmt, time_tuple)
+				whSeason = int(ans[-3])
+				whTimeDelta = datetime.strptime(whDateForm, datetimefrmt) - datetime.now()
+				whDateTime = {'DateTime': whDateForm, 'Season': whSeason, 'TimeDiff':whTimeDelta.seconds}
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение времени прибора учета! Причина: %s' % e)
+				whDateTime = False
 		return whDateTime
 	
 	def whCurVal(self, whAdr=0, whT=0):
@@ -183,16 +216,19 @@ class m230():
 			Tariff 2 energy A: 91.63 R: 0.36
 		"""
 		
+		whCur = False
 		whCurValCmd = chr(whAdr) + '\x05\x00' + chr(whT)
+		logging.info(u'Чтение текущих показаний прибора учета: %s' % str(whAdr))
 		ans = self.cmdWR(whCurValCmd)
-		try:
-			whCurA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.001
-			whCurR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.001
-			#TODO: implements new key ['T'] for indicate the number of tariff in return dict
-			whCur = {'A':whCurA, 'R':whCurR}
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение текущих показаний прибора учета! Причина: %s' % e)
-			whCur = False
+		if self._whAnsCheck(whAdr, ans):
+			try:
+				whCurA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.001
+				whCurR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.001
+				#TODO: implements new key ['T'] for indicate the number of tariff in return dict
+				whCur = {'A':whCurA, 'R':whCurR}
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение текущих показаний прибора учета! Причина: %s' % e)
+				whCur = False
 		return whCur
 	
 	
@@ -228,6 +264,7 @@ class m230():
 			Total energy, last day	A: 276.11 R: 0.63
 		"""
 		
+		whFix = False
 		if currentday == 1:
 			valAdr = {0:'\x06\xA6', 1:'\x06\xB7', 2:'\x06\xC8', 3:'\x06\xD9', 4:'\x06\xEA'}
 		elif currentday == 0:
@@ -236,15 +273,17 @@ class m230():
 			print 'value currentday must be 1 for current day or 0 for previous day'
 			
 		whFixDayCmd = chr(whAdr) + '\x06\x02' + valAdr[whT] + '\x10'
+		logging.info(u'Чтение показаний прибора учета на начало суток: %s' % str(whAdr))
 		ans = self.cmdWR(whFixDayCmd)
-		try:
-			whFixA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
-			whFixR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
-			#TODO: implements new key ['T'] for indicate the number of tariff in return dict
-			whFix = {'A':whFixA, 'R':whFixR}
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало суток! Причина: %s' % e)
-			whFix = False
+		if self._whAnsCheck(whAdr, ans):
+			try:
+				whFixA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
+				whFixR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
+				#TODO: implements new key ['T'] for indicate the number of tariff in return dict
+				whFix = {'A':whFixA, 'R':whFixR}
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало суток! Причина: %s' % e)
+				whFix = False
 		return whFix
 	
 	

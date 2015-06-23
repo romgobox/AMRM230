@@ -51,7 +51,7 @@ class DirectChannel(object):
 		else:
 			logging.debug(u'Инициализация порта: ' + self.port)
 	
-	def TXRX(self, cmd, byteExpected=0):
+	def TXRX(self, cmd):
 		answer = []
 		ansHex = []
 		ansChr=''
@@ -59,8 +59,7 @@ class DirectChannel(object):
 		timeO=0
 		while attempts>0:
 			cmdTX = self.TX(cmd + self.CRC.calculate(cmd))
-			logging.debug(u'TX >>> ' + " ".join(cmdTX[0]) + ' [' + str(cmdTX[1]) +'] ')
-			
+			logging.debug(u'TX >>> %s [%s]' % (" ".join(cmdTX[0]),  str(cmdTX[1])))
 			while timeO < self.whTimeout:
 				time.sleep(0.1)
 				ansChr += self.RX()
@@ -69,7 +68,7 @@ class DirectChannel(object):
 				if self.CRC.check(ansChr):
 					timeO = self.whTimeout
 					cmdRX = [ansHex, len(ansHex)]
-					logging.debug(u'RX <<< ' + " ".join(cmdRX[0]) + ' [' + str(cmdRX[1]) +'] ')
+					logging.debug(u'RX <<< %s [%s]' % (" ".join(cmdRX[0]), str(cmdRX[1])))
 				else:
 					timeO += 0.1
 			if self.CRC.check(ansChr):
@@ -97,6 +96,13 @@ class DirectChannel(object):
 		
 	def RX(self):	
 		return self.ser.read(self.ser.inWaiting())
+		
+	def terminate(self):
+		try:
+			self.ser.close()
+			logging.debug(u'Порт закрыт: %s' % self.port)
+		except:
+			logging.error(u'Не удалось закрыть порт: ' + self.port)
 	
 
 class GSMChannel(object):
@@ -132,9 +138,9 @@ class GSMChannel(object):
 		try:
 			self.ser.open()
 		except Exception:
-			logging.error(u'Не удалось открыть порт: ' + self.port)
+			logging.error(u'Не удалось открыть порт модема: ' + self.port)
 		else:
-			logging.debug(u'Инициализация порта: ' + self.port)
+			logging.debug(u'Инициализация порта модема: ' + self.port)
 			
 		try:
 			self.call(self.phone_number, self.call_attempt)
@@ -248,6 +254,7 @@ class GSMChannel(object):
 	def RX(self):	   
 		return self.ser.read(self.ser.inWaiting())
 	
+	
 class TCPChannel(object):
 	
 	def __init__(self, address, port, whTimeout = 5, attempt = 3, whType=0, connect_attempt=3):
@@ -275,9 +282,10 @@ class TCPChannel(object):
 		
 		try:
 			self.connect(self.address, self.port, self.connect_attempt)
-			logging.debug(u'Соединение установлено!')
 		except socket.error, msg:
 			sys.exit()
+		else:
+			logging.debug(u'Соединение установлено!')
 		
 				
 	def connect(self, address, port, connect_attempt):
@@ -291,6 +299,7 @@ class TCPChannel(object):
 			except socket.error, e:
 				connect_attempt -= 1
 				logging.error(u'Соединение не установлено. Причина: ' % e)
+
 
 	
 	def terminate(self):
@@ -345,7 +354,7 @@ class TCPChannel(object):
 			else:
 				attempts -= 1
 				timeO = 0
-				answer = u'Нет ответа от устройства!'
+				answer = False
 				logging.error(answer)
 		return answer
 	
