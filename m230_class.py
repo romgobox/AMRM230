@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 import logging
 #logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'communications.log')
+#logging.basicConfig(format = u'# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG)
 logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG)
 
 from utils import chSim, udate
@@ -26,6 +27,7 @@ class m230():
 		self.channel = channel
 
 	def cmdWR(self, cmd):
+		 
 		return self.channel.TXRX(cmd)
 
 	def whAuth(self, whAdr=0, whPass=111111, whLevAuth=1):
@@ -52,14 +54,15 @@ class m230():
 			False
 		"""
 		
+		auth = False
 		whPass_chr = ''.join([chr(int(x)) for x in str(whPass)])
 		whAuthCmd = chr(whAdr) + '\x01' + chr(whLevAuth) + whPass_chr
 		logging.debug(u'Соединение со счетчиком %s и паролем %s:' % (str(whAdr), str(whPass)))
-		authAns = self.cmdWR(whAuthCmd)
-		#if authAns[0:2] == [chSim(hex(whAdr)[2:]), '00']:
-		if self._whAnsCheck(whAdr, authAns):
+		ans = self.cmdWR(whAuthCmd)
+		if ans and self._whAnsCheck(whAdr, ans):
 			logging.debug(u'Соединение со счетчиком %s и паролем %s установлено!' % (str(whAdr), str(whPass)))
 			auth = True
+
 		else:
 			logging.error(u'Не удалось установить соединение со счетчиком %s' % str(whAdr))
 			auth = False
@@ -87,9 +90,8 @@ class m230():
 
 		logOutCmd = chr(whAdr) + '\x02'
 		logging.info(u'Разрываем соединение с прибром учета: %s' % str(whAdr))
-		logOutAns = self.cmdWR(logOutCmd)
-		#if logOutAns[0:2] == [chSim(hex(whAdr)[2:]), '00']:
-		if self._whAnsCheck(whAdr, logOutAns):
+		ans = self.cmdWR(logOutCmd)
+		if ans and self._whAnsCheck(whAdr, ans):
 			logging.debug(u'Соединение со счетчиком %s разорвано!' % (str(whAdr), ))
 			logOut = True
 		else:
@@ -138,13 +140,16 @@ class m230():
 		whNumCmd = chr(whAdr) + '\x08\x00'
 		logging.info(u'Чтение серийного номера прибора учета: %s' % str(whAdr))
 		ans = self.cmdWR(whNumCmd)
-		if self._whAnsCheck(whAdr, ans):
+		if ans and self._whAnsCheck(whAdr, ans):
 			try:
 				whN = [chSim(str(int(x, 16))) for x in ans[1:5]]
 				whNum = "".join(whN)
 			except Exception, e:
 				logging.error(u'Не удалось выполнить чтение серийного номера прибора учета! Причина: %s' % e)
 				whNum = False
+		else:
+			logging.error(u'Не удалось выполнить чтение серийного номера прибора учета %s!' % str(whAdr))
+			whNum = False
 		return whNum
 		
    
@@ -173,7 +178,7 @@ class m230():
 		whTimeCmd = chr(whAdr) + '\x04\x00'
 		logging.info(u'Чтение текущей даты и времени прибора учета: %s' % str(whAdr))
 		ans = self.cmdWR(whTimeCmd)
-		if self._whAnsCheck(whAdr, ans):
+		if ans and self._whAnsCheck(whAdr, ans):
 			try:
 				time_tuple = [int(x) for x in ans[5:8]][::-1] + [int(x) for x in ans[1:4]][::-1] + [0,1] + [int(ans[-3])]
 				whDateForm = time.strftime(datetimefrmt, time_tuple)
@@ -183,6 +188,9 @@ class m230():
 			except Exception, e:
 				logging.error(u'Не удалось выполнить чтение времени прибора учета! Причина: %s' % e)
 				whDateTime = False
+		else:
+			logging.error(u'Не удалось выполнить чтение времени прибора учета %s!' % str(whAdr))
+			whDateTime = False
 		return whDateTime
 	
 	def whCurVal(self, whAdr=0, whT=0):
@@ -220,15 +228,18 @@ class m230():
 		whCurValCmd = chr(whAdr) + '\x05\x00' + chr(whT)
 		logging.info(u'Чтение текущих показаний прибора учета: %s' % str(whAdr))
 		ans = self.cmdWR(whCurValCmd)
-		if self._whAnsCheck(whAdr, ans):
+		if ans and self._whAnsCheck(whAdr, ans):
 			try:
 				whCurA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.001
 				whCurR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.001
-				#TODO: implements new key ['T'] for indicate the number of tariff in return dict
+					#TODO: implements new key ['T'] for indicate the number of tariff in return dict
 				whCur = {'A':whCurA, 'R':whCurR}
 			except Exception, e:
 				logging.error(u'Не удалось выполнить чтение текущих показаний прибора учета! Причина: %s' % e)
 				whCur = False
+		else:
+			logging.error(u'Не удалось выполнить чтение текущих показаний прибора учета %s!' % str(whAdr))
+			whCur = False
 		return whCur
 	
 	
@@ -275,15 +286,18 @@ class m230():
 		whFixDayCmd = chr(whAdr) + '\x06\x02' + valAdr[whT] + '\x10'
 		logging.info(u'Чтение показаний прибора учета на начало суток: %s' % str(whAdr))
 		ans = self.cmdWR(whFixDayCmd)
-		if self._whAnsCheck(whAdr, ans):
+		if ans and self._whAnsCheck(whAdr, ans):
 			try:
 				whFixA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
 				whFixR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
-				#TODO: implements new key ['T'] for indicate the number of tariff in return dict
+					#TODO: implements new key ['T'] for indicate the number of tariff in return dict
 				whFix = {'A':whFixA, 'R':whFixR}
 			except Exception, e:
 				logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало суток! Причина: %s' % e)
 				whFix = False
+		else:
+			logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета %s на начало суток!' % str(whAdr))
+			whFix = False
 		return whFix
 	
 	
@@ -319,7 +333,7 @@ class m230():
 			>>> print 'Total energy, May  A: %.2f R: %.2f' % (totalEn['A'], totalEn['R'])
 			Total energy, May  A: 276.11 R: 0.63
 		"""
-		
+		whFixM = False
 		valAdr = {
 			1:{0:'\x02\xAA', 1:'\x02\xBB', 2:'\x02\xCC', 3:'\x02\xDD', 4:'\x02\xEE'},
 			2:{0:'\x02\xFF', 1:'\x03\x10', 2:'\x03\x21', 3:'\x03\x32', 4:'\x03\x43'},
@@ -335,13 +349,18 @@ class m230():
 			12:{0:'\x06\x51', 1:'\x06\x62', 2:'\x06\x73', 3:'\x06\x84', 4:'\x06\x95'}
 		}
 		whFixMonthCmd = chr(whAdr) + '\x06\x02' + valAdr[month][whT] + '\x10'
+		logging.info(u'Чтение показаний прибора учета на начало месяца: %s' % str(whAdr))
 		ans = self.cmdWR(whFixMonthCmd)
-		try:
-			whFixMA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
-			whFixMR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
-			whFixM = {'A':whFixMA, 'R':whFixMR}
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало месяца! Причина: %s' % e)
+		if ans and self._whAnsCheck(whAdr, ans):
+			try:
+				whFixMA = int(ans[2] + ans[1] + ans[4] + ans[3], 16) * 0.0005
+				whFixMR = int(ans[10] + ans[9] + ans[12] + ans[11], 16) * 0.0005
+				whFixM = {'A':whFixMA, 'R':whFixMR}
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета на начало месяца! Причина: %s' % e)
+				whFixM = False
+		else:
+			logging.error(u'Не удалось выполнить чтение зафиксированных показаний прибора учета %s на начало месяца!' % str(whAdr))
 			whFixM = False
 		return whFixM
 	
@@ -375,23 +394,27 @@ class m230():
 				(PPLR['Status'], PPLR['Period'], PPLR['HiB'], PPLR['LoB'], PPLR['d'], PPLR['m'], PPLR['y'], PPLR['H'], PPLR['M'])
 			Last Record Status: 11001, Period: 30, High Byte: 49, Low Byte: 30, DateTime: 16-06-15 12:30
 		"""
-	
+		PPLR = False
 		whPPLRCmd = chr(whAdr) + '\x08\x13'
 		ans = self.cmdWR(whPPLRCmd)
-		try:
-			PPLR = {
-					'HiB':ans[1],
-					'LoB':ans[2],
-					'Status':bin(int(ans[3], 16))[2:],
-					'H':chSim(ans[4]),
-					'M':chSim(ans[5]),
-					'd':chSim(ans[6]),
-					'm':chSim(ans[7]),
-					'y':chSim(ans[8]),
-					'Period':int(ans[9], 16),
-					}
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение последней записи профиля мощности! Причина: %s' % e)
+		if ans and self._whAnsCheck(whAdr, ans):
+			try:
+				PPLR = {
+						'HiB':ans[1],
+						'LoB':ans[2],
+						'Status':bin(int(ans[3], 16))[2:],
+						'H':chSim(ans[4]),
+						'M':chSim(ans[5]),
+						'd':chSim(ans[6]),
+						'm':chSim(ans[7]),
+						'y':chSim(ans[8]),
+						'Period':int(ans[9], 16),
+						}
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение последней записи профиля мощности! Причина: %s' % e)
+				PPLR = False
+		else:
+			logging.error(u'Не удалось выполнить чтение последней записи профиля мощности!')
 			PPLR = False
 		return PPLR
 	
@@ -435,20 +458,24 @@ class m230():
 		chByte = lambda x: chr(int(x, 16))
 		whPPValCmd = chr(whAdr) + '\x06\x03' + chByte(HiB) + chByte(LoB) + '\x0F'
 		ans = self.cmdWR(whPPValCmd)
-		try:
-			PPV = {
-					'Status':bin(int(ans[1], 16))[2:],
-					'H':chSim(ans[2]),
-					'M':chSim(ans[3]),
-					'd':chSim(ans[4]),
-					'm':chSim(ans[5]),
-					'y':chSim(ans[6]),
-					'Period':int(ans[7], 16),
-					'A':int(ans[9]+ans[8], 16)*0.001,
-					'R':int(ans[13]+ans[12], 16)*0.001
-					}
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение записи профиля мощности по адресу 0x%s%s! Причина: %s' % (HiB,LoB,e))
+		if ans and self._whAnsCheck(whAdr, ans):
+			try:
+				PPV = {
+						'Status':bin(int(ans[1], 16))[2:],
+						'H':chSim(ans[2]),
+						'M':chSim(ans[3]),
+						'd':chSim(ans[4]),
+						'm':chSim(ans[5]),
+						'y':chSim(ans[6]),
+						'Period':int(ans[7], 16),
+						'A':int(ans[9]+ans[8], 16)*0.001,
+						'R':int(ans[13]+ans[12], 16)*0.001
+						}
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение записи профиля мощности по адресу 0x%s%s! Причина: %s' % (HiB,LoB,e))
+				PPV = False
+		else:
+			logging.error(u'Не удалось выполнить чтение записи профиля мощности по адресу 0x%s%s!' % (HiB,LoB))
 			PPV = False
 		return PPV
 	
@@ -489,11 +516,14 @@ class m230():
 				Status: 1001 DateTime: 16.06.15 14:30 Period: 30 A: 0.000 R: 0.000
 		"""
 		
+		PPDVres = False
 		PPDV = {}
 		ADR = None
+		logging.info(u'Чтение профиля мощности прибора учета %s на глубину %s записей' % (str(whAdr), depth))
 		try:
 			PPLR = self.whPPLastRecord(whAdr)
-			ADR = int(PPLR['HiB']+PPLR['LoB'], 16)
+			if PPLR:
+				ADR = int(PPLR['HiB']+PPLR['LoB'], 16)
 		except Exception, e:
 			logging.error(u'Не удалось выполнить чтение последней записи профиля мощности для расчета глубины опроса! Причина: %s' % (e))
 			PPDVres = False
@@ -548,11 +578,15 @@ class m230():
 		for p in ph:
 			whUCmd = chr(whAdr) + '\x08\x11' + ph[p]
 			ans = self.cmdWR(whUCmd)
-			try:
-				U[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
-			except Exception, e:
-				logging.error(u'Не удалось выполнить чтение значения напряжения фазы %d! Причина: %s' % (p,e))
-				U[p] = -1
+			if ans and self._whAnsCheck(whAdr, ans):
+				try:
+					U[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
+				except Exception, e:
+					logging.error(u'Не удалось выполнить чтение значения напряжения фазы %d! Причина: %s' % (p,e))
+					U = False
+			else:
+				logging.error(u'Не удалось выполнить чтение значений напряжения!')
+				U = False
 		return U
 	
 	def whUAngle(self, whAdr):
@@ -583,11 +617,15 @@ class m230():
 		for p in ph:
 			whUAnCmd = chr(whAdr) + '\x08\x11' + ph[p]
 			ans = self.cmdWR(whUAnCmd)
-			try:
-				UAn[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
-			except Exception, e:
-				logging.error(u'Не удалось выполнить чтение значения угла между фазами %d! Причина: %s' % (p,e))
-				UAn[p] = -1	
+			if ans and self._whAnsCheck(whAdr, ans):
+				try:
+					UAn[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
+				except Exception, e:
+					logging.error(u'Не удалось выполнить чтение значения угла между фазами %d! Причина: %s' % (p,e))
+					UAn = False	
+			else:
+				logging.error(u'Не удалось выполнить чтение значений углов между фазами!')
+				UAn = False	
 		return UAn
 
 	
@@ -619,11 +657,15 @@ class m230():
 		for p in ph:
 			whICmd = chr(whAdr) + '\x08\x11' + ph[p]
 			ans = self.cmdWR(whICmd)
-			try:
-				I[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001 #умножение на 0.001 - не ошибка
-			except Exception, e:
-				logging.error(u'Не удалось выполнить чтение значения тока фазы %d! Причина: %s' % (p,e))
-				I[p] = -1
+			if ans and self._whAnsCheck(whAdr, ans):
+				try:
+					I[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001 #умножение на 0.001 - не ошибка
+				except Exception, e:
+					logging.error(u'Не удалось выполнить чтение значения тока фазы %d! Причина: %s' % (p,e))
+					I = False
+			else:
+				logging.error(u'Не удалось выполнить чтение значений тока!')
+				I = False
 		return I
 	
 	def whP(self, whAdr, en='P'):
@@ -660,11 +702,15 @@ class m230():
 		for p in ph[en]:
 			whPCmd = chr(whAdr) + '\x08\x11' + ph[en][p]
 			ans = self.cmdWR(whPCmd)
-			try:
-				P[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
-			except Exception, e:
-				logging.error(u'Не удалось выполнить чтение значения мощности фазы %d! Причина: %s' % (p,e))
-				P[p] = -1
+			if ans and self._whAnsCheck(whAdr, ans):
+				try:
+					P[p] = int(ans[1]+ans[3]+ans[2], 16)*0.01
+				except Exception, e:
+					logging.error(u'Не удалось выполнить чтение значения мощности фазы %d! Причина: %s' % (p,e))
+					P = False
+			else:
+				logging.error(u'Не удалось выполнить чтение значений мощности!')
+				P = False
 		return P
 	
 	def whCosf(self, whAdr, en='P'):
@@ -697,11 +743,15 @@ class m230():
 		for p in ph:
 			whCosfCmd = chr(whAdr) + '\x08\x11' + ph[p]
 			ans = self.cmdWR(whCosfCmd)
-			try:
-				Cosf[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
-			except Exception, e:
-				logging.error(u'Не удалось выполнить чтение значения к-та мощности фазы %d! Причина: %s' % (p,e))
-				Cosf[p] = -1
+			if ans and self._whAnsCheck(whAdr, ans):
+				try:
+					Cosf[p] = int(ans[1]+ans[3]+ans[2], 16)*0.001
+				except Exception, e:
+					logging.error(u'Не удалось выполнить чтение значения к-та мощности фазы %d! Причина: %s' % (p,e))
+					Cosf = False
+			else:
+				logging.error(u'Не удалось выполнить чтение значений к-та мощности!')
+				Cosf = False
 		return Cosf
 	
 	def whFreq(self, whAdr):
@@ -729,11 +779,15 @@ class m230():
 		Freq = 0
 		whFreqCmd = chr(whAdr) + '\x08\x11\x40'
 		ans = self.cmdWR(whFreqCmd)
-		try:
-			Freq = int(ans[1]+ans[3]+ans[2], 16)*0.01
-		except Exception, e:
-			logging.error(u'Не удалось выполнить чтение значения частоты! Причина: %s' % (e))
-			Freq = -1
+		if ans and self._whAnsCheck(whAdr, ans):
+			try:
+				Freq = int(ans[1]+ans[3]+ans[2], 16)*0.01
+			except Exception, e:
+				logging.error(u'Не удалось выполнить чтение значения частоты! Причина: %s' % (e))
+				Freq = False
+		else:
+			logging.error(u'Не удалось выполнить чтение значения частоты!')
+			Freq = False
 		return Freq
 	
 	def whTestCMD(self, cmd='', useAdr=True, whAdr=0, Prefix='', HiB='', LoB='', Postfix=''):
