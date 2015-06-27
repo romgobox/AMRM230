@@ -9,7 +9,9 @@ import datetime
 import serial
 import logging
 #logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'communications.log')
+#logging.basicConfig(format = u'# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG)
 logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-4s [%(asctime)s] %(message)s', level = logging.DEBUG)
+
 
 from utils import chSim, udate
 from CRC import CRC_M230
@@ -276,13 +278,14 @@ class TCPChannel(object):
 			
 		try:
 			self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		except socket.error:
-			logging.error(u'Не удалось создать сокет!')
+		except socket.error, e:
+			logging.error(u'Не удалось создать сокет! %s' % e)
 			self.terminate()
 		
 		try:
 			self.connect(self.address, self.port, self.connect_attempt)
 		except socket.error, msg:
+			logging.error(u'Не удалось подключиться к хосту %s:%s. Причина: %s' % (self.address, self.port, e))
 			sys.exit()
 		else:
 			logging.debug(u'Соединение установлено!')
@@ -355,7 +358,10 @@ class TCPChannel(object):
 				attempts -= 1
 				timeO = 0
 				answer = False
-				logging.error(answer)
+				if attempts>0:
+					logging.error(u'Осталось попыток запроса: %d' % attempts)
+				else:
+					logging.error(u'Количество попыток запроса исчерпано!')
 		return answer
 	
 	
@@ -396,7 +402,7 @@ class TCPChannel(object):
 			chunk = self.sock.recv(1024)
 			self.sock.settimeout(None)
 		except socket.error, e:
-			logging.error(u'Нет ответа от счетчика. Причина: %s' % e)
+			logging.error(u'Нет ответа на запрос! Причина: %s' % e)
 		"""
 		chunks = ''
 		bytes_recd = 0
